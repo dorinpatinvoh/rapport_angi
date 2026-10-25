@@ -1,0 +1,22 @@
+ALTER TABLE users ADD COLUMN team VARCHAR(20);
+ALTER TABLE users ADD COLUMN referral_code VARCHAR(100);
+CREATE UNIQUE INDEX ux_team_referral ON users(team, referral_code);
+ALTER TABLE reports ADD COLUMN team VARCHAR(20);
+ALTER TABLE reports ADD COLUMN report_date DATE;
+UPDATE reports SET report_date = CAST(created_at AS DATE);
+ALTER TABLE reports ALTER COLUMN report_date SET NOT NULL;
+ALTER TABLE reports ADD COLUMN mode VARCHAR(20) NOT NULL DEFAULT 'WRITTEN';
+ALTER TABLE reports ADD COLUMN prospects_contacted INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE reports ADD COLUMN registrations INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE reports ADD COLUMN stats_source VARCHAR(20) NOT NULL DEFAULT 'DECLARED';
+ALTER TABLE reports ADD COLUMN stats_fetched_at TIMESTAMP;
+ALTER TABLE reports ADD COLUMN referral_code VARCHAR(100);
+ALTER TABLE reports ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+CREATE TABLE report_reviews (
+ id BIGSERIAL PRIMARY KEY,
+ report_id BIGINT NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+ reviewer_id BIGINT NOT NULL REFERENCES users(id),
+ action VARCHAR(20) NOT NULL,
+ comment TEXT NOT NULL,
+ created_at TIMESTAMP NOT NULL
+);
