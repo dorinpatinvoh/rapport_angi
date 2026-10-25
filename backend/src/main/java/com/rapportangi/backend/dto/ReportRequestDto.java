@@ -1,8 +1,13 @@
 package com.rapportangi.backend.dto;
 
+import jakarta.validation.constraints.*;
+
 public class ReportRequestDto {
+    @NotBlank @Size(max = 200)
     private String title;
+    @NotBlank @Size(max = 50000)
     private String content;
+    @Pattern(regexp = "DRAFT|SUBMITTED")
     private String status;
     private Long authorId;
 
