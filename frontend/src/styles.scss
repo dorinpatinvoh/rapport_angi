@@ -1,4 +1,435 @@
-@import "bootstrap/scss/bootstrap";
+@use "bootstrap/scss/bootstrap" with (
+  $primary: #641587,
+  $font-family-sans-serif: (
+    "Segoe UI",
+    sans-serif,
+  ),
+  $border-radius: 0.65rem
+);
 @import "bootstrap-icons/font/bootstrap-icons.css";
-body{background:#f4f7fb;color:#213047}.side{background:#12325f;min-height:100vh;color:#fff}.side a{color:#d9e8fa;text-decoration:none;display:block;padding:13px;border-radius:9px}.side a.active,.side a:hover{background:#27548b;color:#fff}.panel{background:white;border:1px solid #e5ecf4;border-radius:16px;padding:25px}.brand{font-weight:800;letter-spacing:.06em}.topbar{background:white;border-bottom:1px solid #e5ecf4;padding:18px 25px}.content{padding:32px}.metric{font-size:2rem;font-weight:700}.empty{padding:50px;text-align:center;color:#6d829a}@media(max-width:767px){.side{min-height:auto}.content{padding:18px}}
-.report-body{white-space:pre-wrap;overflow-wrap:anywhere}.table td{max-width:380px;overflow-wrap:anywhere}
+:root {
+  --angi-purple: #641587;
+  --angi-orange: #f57819;
+  --ink: #261c35;
+  --muted: #766b80;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #f7f5fa;
+  color: var(--ink);
+}
+h1 {
+  font-size: clamp(1.7rem, 3vw, 2.2rem);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+}
+h2,
+h3 {
+  overflow-wrap: anywhere;
+}
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+button.btn,
+a.btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+input.form-control,
+select.form-select {
+  min-height: 48px;
+}
+textarea.form-control {
+  font-size: 1rem;
+  line-height: 1.65;
+}
+.form-label {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+.side {
+  background: linear-gradient(165deg, #3a104e, #651584);
+  width: 250px;
+  flex-shrink: 0;
+  color: #fff;
+  padding: 26px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.brand-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+.brand-link img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  border-radius: 50%;
+  background: #fff;
+}
+.brand-link small {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  opacity: 0.75;
+  margin-top: 3px;
+}
+.side nav {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.side nav a {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: #ede1f5;
+  text-decoration: none;
+  padding: 13px 14px;
+  border-radius: 12px;
+  font-size: 0.93rem;
+  min-height: 48px;
+}
+.side nav a.active,
+.side nav a:hover {
+  background: #ffffff20;
+  color: #fff;
+}
+.side nav a.active {
+  box-shadow: inset 3px 0 var(--angi-orange);
+}
+.user-block {
+  margin-top: auto;
+  border-top: 1px solid #ffffff30;
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+}
+.user-block span {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+.workspace {
+  flex: 1;
+  min-width: 0;
+}
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border-bottom: 1px solid #ebe5ef;
+  padding: 20px 32px;
+  font-weight: 650;
+}
+.header-tag {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--angi-purple);
+}
+.content {
+  padding: 32px;
+  max-width: 1440px;
+  margin: auto;
+}
+.panel {
+  background: #fff;
+  border: 1px solid #e9e2ef;
+  border-radius: 18px;
+  padding: 26px;
+  box-shadow: 0 5px 24px #42265c04;
+}
+.page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.eyebrow {
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  font-weight: 750;
+  color: var(--angi-purple);
+  margin-bottom: 8px;
+}
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 18px;
+}
+.report-card {
+  display: flex;
+  flex-direction: column;
+}
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+.card-actions .btn {
+  font-size: 0.85rem;
+}
+.team-pill {
+  font-size: 0.75rem;
+  color: var(--angi-purple);
+  background: #f2eaf8;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+.report-status {
+  align-self: flex-start;
+  font-weight: 600;
+  padding: 7px 10px;
+  background: #ede9f2;
+  color: #62566e;
+}
+.report-status[data-status="SUBMITTED"] {
+  background: #fff0df;
+  color: #a05400;
+}
+.report-status[data-status="RETURNED"] {
+  background: #ffebe6;
+  color: #a13617;
+}
+.report-status[data-status="CONFIRMED"] {
+  background: #e8f5ee;
+  color: #226343;
+}
+.stats-box,
+.review-box {
+  background: #faf7fc;
+  border: 1px solid #eadcf2;
+  padding: 20px;
+  border-radius: 12px;
+}
+.metric {
+  font-size: 2rem;
+  font-weight: 750;
+  color: var(--angi-purple);
+}
+.detail-letterhead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 2px solid var(--angi-orange);
+  padding-bottom: 20px;
+}
+.company-logo {
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+}
+.team-logo {
+  margin-left: auto;
+  width: 64px;
+  height: 64px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.team-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.team-logo.zehami img {
+  position: absolute;
+  width: 278%;
+  height: auto;
+  max-width: none;
+  left: -89%;
+  top: -22%;
+}
+.report-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  background: #faf8fc;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+.report-meta dt {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+.report-meta dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.report-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.85;
+  font-size: 1rem;
+}
+.review-note {
+  border-left: 3px solid var(--angi-orange);
+  background: #fff8f1;
+  padding: 16px;
+  margin-top: 12px;
+  border-radius: 0 10px 10px 0;
+}
+.auth-panel {
+  max-width: 600px;
+  margin: 20px auto;
+}
+.empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
+}
+#report-detail,
+#report-form {
+  scroll-margin-top: 18px;
+}
+summary {
+  cursor: pointer;
+  min-height: 30px;
+}
+@media (max-width: 900px) {
+  .side {
+    width: 205px;
+  }
+  .content {
+    padding: 24px;
+  }
+  .side {
+    padding: 20px 12px;
+  }
+  .brand-link {
+    font-size: 0.8rem;
+  }
+}
+@media (max-width: 767px) {
+  .app-shell {
+    display: block;
+  }
+  .side {
+    width: auto;
+    padding: 14px 16px;
+    gap: 14px;
+  }
+  .brand-link img {
+    width: 42px;
+    height: 42px;
+  }
+  .side nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .side nav a {
+    padding: 9px 12px;
+    min-height: 44px;
+    font-size: 0.82rem;
+  }
+  .side nav a i {
+    display: none;
+  }
+  .user-block {
+    margin: 0;
+    padding-top: 12px;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .user-block strong {
+    font-size: 0.82rem;
+  }
+  .user-block .btn {
+    margin: 0 0 0 auto !important;
+    font-size: 0.8rem;
+  }
+  .topbar {
+    padding: 13px 18px;
+    font-size: 0.82rem;
+  }
+  .header-tag {
+    font-size: 0.6rem;
+  }
+  .content {
+    padding: 20px 14px;
+  }
+  .panel {
+    padding: 20px 16px;
+    border-radius: 14px;
+  }
+  .page-heading {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .page-heading > .btn,
+  .w-mobile {
+    width: 100%;
+  }
+  .page-heading p {
+    margin-bottom: 0;
+  }
+  .auth-panel {
+    margin: 0 auto;
+  }
+  .report-meta {
+    gap: 14px;
+    padding: 16px;
+  }
+  .detail-letterhead {
+    gap: 10px;
+  }
+  .company-logo {
+    width: 48px;
+    height: 48px;
+  }
+  .detail-letterhead .eyebrow {
+    font-size: 0.6rem;
+  }
+  .detail-letterhead p.text-secondary {
+    font-size: 0.7rem;
+  }
+  .team-logo {
+    width: 48px;
+    height: 48px;
+  }
+  .card-actions .btn {
+    flex: 1;
+  }
+  .stats-box,
+  .review-box {
+    padding: 16px;
+  }
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+  .report-body {
+    font-size: 1rem;
+  }
+}

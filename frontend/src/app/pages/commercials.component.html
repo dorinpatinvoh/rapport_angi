@@ -1,0 +1,154 @@
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">Administration</p>
+    <h1>Commerciaux</h1>
+    <p class="text-secondary">
+      Créez les comptes terrain et validez les demandes d'inscription.
+    </p>
+  </div>
+</div>
+@if (error()) {
+  <div class="alert alert-danger" role="alert">{{ error() }}</div>
+}
+@if (success()) {
+  <div class="alert alert-success" role="status">{{ success() }}</div>
+}
+<details class="panel mb-4">
+  <summary class="fw-semibold">Créer directement un commercial</summary>
+  <form class="mt-4" [formGroup]="form" (ngSubmit)="create()">
+    <div class="row g-3">
+      <div class="col-sm-6">
+        <label for="createFirst" class="form-label">Prénom</label
+        ><input
+          id="createFirst"
+          class="form-control"
+          formControlName="firstName"
+          maxlength="100"
+          required
+        />
+      </div>
+      <div class="col-sm-6">
+        <label for="createLast" class="form-label">Nom</label
+        ><input
+          id="createLast"
+          class="form-control"
+          formControlName="lastName"
+          maxlength="100"
+          required
+        />
+      </div>
+      <div class="col-sm-6">
+        <label for="createEmail" class="form-label">Email</label
+        ><input
+          id="createEmail"
+          class="form-control"
+          formControlName="email"
+          type="email"
+          maxlength="150"
+          required
+        />
+      </div>
+      <div class="col-sm-6">
+        <label for="createPassword" class="form-label"
+          >Mot de passe initial</label
+        ><input
+          id="createPassword"
+          class="form-control"
+          formControlName="password"
+          type="password"
+          autocomplete="new-password"
+          minlength="12"
+          maxlength="72"
+          required
+        /><span class="form-text"
+          >12 à 72 caractères, à transmettre personnellement.</span
+        >
+      </div>
+      <div class="col-sm-6">
+        <label for="createTeam" class="form-label">Équipe</label
+        ><select id="createTeam" class="form-select" formControlName="team">
+          <option value="AZO">AZO</option>
+          <option value="ZEHAMI">Zehami</option>
+        </select>
+      </div>
+      <div class="col-sm-6">
+        <label for="createCode" class="form-label"
+          >Code de parrainage mobile (facultatif)</label
+        ><input
+          id="createCode"
+          class="form-control"
+          formControlName="referralCode"
+          maxlength="100"
+        />
+      </div>
+    </div>
+    <p class="small text-secondary mt-3">
+      Le code doit correspondre à celui attribué par l'application mobile. Cette
+      saisie ne crée pas de compte dans AZO ou Zehami.
+    </p>
+    <button
+      class="btn btn-primary"
+      type="submit"
+      [disabled]="busy() || form.invalid"
+    >
+      Créer et activer le compte
+    </button>
+  </form>
+</details>
+@if (loading()) {
+  <p role="status">Chargement des commerciaux…</p>
+}
+<div class="report-grid">
+  @for (u of users(); track u.id) {
+    <article class="panel">
+      <div class="d-flex justify-content-between gap-2">
+        <h2 class="h5">{{ u.firstName }} {{ u.lastName }}</h2>
+        <span
+          class="badge align-self-start"
+          [class.text-bg-success]="u.enabled"
+          [class.text-bg-warning]="!u.enabled"
+          >{{ u.enabled ? "Actif" : "En attente / inactif" }}</span
+        >
+      </div>
+      <p class="text-secondary text-break">{{ u.email }}</p>
+      <label [for]="'team-' + u.id" class="form-label">Équipe</label
+      ><select
+        #team
+        [id]="'team-' + u.id"
+        class="form-select mb-3"
+        [value]="u.team || 'AZO'"
+      >
+        <option value="AZO">AZO</option>
+        <option value="ZEHAMI">Zehami</option>
+      </select>
+      <label [for]="'code-' + u.id" class="form-label">Code de parrainage</label
+      ><input
+        #code
+        [id]="'code-' + u.id"
+        class="form-control mb-3"
+        [value]="u.referralCode || ''"
+        maxlength="100"
+      />
+      <div class="d-flex flex-wrap gap-2">
+        <button
+          class="btn btn-primary"
+          [disabled]="busy()"
+          (click)="update(u, team.value, code.value, true)"
+        >
+          {{ u.enabled ? "Enregistrer" : "Activer le compte" }}
+        </button>
+        @if (u.enabled) {
+          <button
+            class="btn btn-outline-danger"
+            [disabled]="busy()"
+            (click)="update(u, team.value, code.value, false)"
+          >
+            Désactiver
+          </button>
+        }
+      </div>
+    </article>
+  } @empty {
+    <div class="panel empty">Aucun commercial inscrit pour le moment.</div>
+  }
+</div>

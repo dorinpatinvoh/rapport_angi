@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "start": "ng serve --proxy-config proxy.conf.json",
-    "build": "ng build"
+    "build": "ng build",
+    "test:smoke": "node scripts/run-smoke.cjs"
   },
   "dependencies": {
     "@angular/common": "^20.3.0",
@@ -23,6 +24,7 @@
     "@angular/build": "^20.3.0",
     "@angular/cli": "^20.3.0",
     "@angular/compiler-cli": "^20.3.0",
+    "@playwright/test": "^1.64.1",
     "typescript": "~5.9.2"
   }
 }

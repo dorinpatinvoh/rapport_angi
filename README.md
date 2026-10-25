@@ -1,64 +1,135 @@
-# Rapports ANGI DSN PRO
+# Rapports terrain - ANGI DSN PRO SARL
 
-Application Angular 20 + Spring Boot 4 / Java 21 pour les comptes rendus commerciaux.
+Angular 20 + Spring Boot 4 / Java 21 : comptes commerciaux AZO et Zehami, rapports quotidiens et suivi par le super administrateur. Interface adaptée au téléphone, à la tablette et à l'ordinateur, avec les couleurs et les logos fournis par ANGI.
 
-## Fonctionnalités
+## Comptes et inscription
 
-- Connexion et déconnexion par session HTTP (mot de passe BCrypt, cookie de session HttpOnly).
-- Protection CSRF des écritures, y compris connexion et déconnexion.
-- Un commercial consulte, crée, modifie et supprime ses propres rapports.
-- ADMIN et SUPER_ADMIN peuvent consulter, modifier et supprimer tous les rapports.
-- L'auteur vient de la session : `authorId` envoyé par un client est ignoré.
-- Brouillons et rapports soumis restent modifiables ; aucune validation hiérarchique n'est implémentée à ce stade.
-- Lecture du contenu, recherche, filtre par statut, confirmation de suppression et statistiques réelles.
+- Le premier SUPER_ADMIN se crée par variables d'environnement (voir le démarrage ci-dessous). Un compte existant n'est pas recréé.
+- Le lien **Créer mon compte** de la connexion ouvre `/inscription`. Le commercial saisit prénom, nom, email, mot de passe et équipe. Le compte reste inactif jusqu'à validation.
+- Connecté comme SUPER_ADMIN, ouvrir **Commerciaux**. Activer la demande, choisir l'équipe et renseigner si disponible le code de parrainage de l'application mobile.
+- Pour créer directement un commercial, ouvrir **Commerciaux > Créer directement un commercial**, remplir les champs et cliquer **Créer et activer le compte**. Transmettre personnellement l'email et le mot de passe initial au commercial. Aucun email automatique n'est envoyé.
+- Un code de parrainage doit être unique dans son équipe. Il doit déjà exister dans l'application AZO ou Zehami : cette application ne crée pas de comptes dans les applications mobiles.
+- Les mots de passe sont stockés avec BCrypt. Aucune inscription publique ne permet de choisir un rôle administrateur ou de s'attribuer un code de parrainage.
+
+## Rapport sur mobile
+
+1. Se connecter, ouvrir **Rapports > Rédiger un rapport**.
+2. Choisir la journée et le mode : compte rendu écrit, ou statistiques avec observations facultatives.
+3. En mode écrit, raconter les zones visitées, les besoins, les résultats, les difficultés et les prochaines actions.
+4. En mode statistiques, saisir les prospects contactés et les inscriptions attribuées. Sans API, les chiffres sont explicitement déclaratifs. Si l'API de l'équipe est configurée, cocher l'import ; les chiffres sont récupérés de nouveau côté serveur à l'enregistrement.
+5. Enregistrer en brouillon ou soumettre au super administrateur. Après soumission, le contenu est verrouillé.
+6. Le SUPER_ADMIN ouvre **Lire le rapport**, puis confirme le rapport ou utilise **Renvoyer pour confirmation**, avec un commentaire obligatoire. Le commercial consulte le commentaire, corrige/complète et soumet à nouveau. L'historique des retours est conservé.
+7. Le bouton **PDF** télécharge un document avec le logo ANGI, celui de l'équipe, le nom du commercial, la journée, les chiffres et leur origine, les observations et le suivi. Les longues descriptions passent sur plusieurs pages.
+
+Un commercial ne voit que ses rapports. ADMIN et SUPER_ADMIN peuvent lire tous les rapports et leurs PDF ; seul SUPER_ADMIN gère les commerciaux et examine les soumissions. Seul l'auteur peut modifier son contenu ; seuls les brouillons sont supprimables. Un super administrateur ne peut pas confirmer ses propres rapports. Les conflits entre deux versions ouvertes simultanément sont refusés plutôt que d'écraser silencieusement une modification.
 
 ## Démarrage sous Windows PowerShell
 
 Prérequis : JDK 21, Node 24, PostgreSQL (ou Docker Desktop démarré).
 
-Dans la racine du dépôt, définir les variables pour le terminal courant :
+Dans le terminal du backend, définir les informations de connexion à PostgreSQL si elles diffèrent des valeurs locales par défaut :
 
 ```powershell
+$env:DB_URL = "jdbc:postgresql://localhost:5434/rapport_angi"
+$env:DB_USERNAME = "postgres"
 $env:DB_PASSWORD = Read-Host "Mot de passe PostgreSQL"
+```
+
+Pour une **nouvelle** base via Docker, depuis la racine : `docker compose up -d db`. Pour une base déjà existante, utiliser ses coordonnées et conserver ses données.
+
+Créer le premier administrateur avec un email nouveau (inutile si votre compte SUPER_ADMIN fonctionne déjà) :
+
+```powershell
 $env:BOOTSTRAP_ADMIN_EMAIL = "votre-email@example.com"
-$secret = Read-Host "Mot de passe initial administrateur (12 à 72 caractères ASCII)" -AsSecureString
+$secret = Read-Host "Mot de passe initial admin (12 à 72 caractères ASCII)" -AsSecureString
 $env:BOOTSTRAP_ADMIN_PASSWORD = [System.Net.NetworkCredential]::new("", $secret).Password
-```
-
-Pour une base **neuve** avec Docker :
-
-```powershell
-docker compose up -d db
-```
-
-Ou créer la base `rapport_angi` sur PostgreSQL, puis adapter `DB_URL` (par défaut `jdbc:postgresql://localhost:5434/rapport_angi`) et `DB_USERNAME` (par défaut `postgres`).
-
-Démarrer le backend dans ce même terminal :
-
-```powershell
 cd backend
+.\mvnw.cmd spring-boot:run
+```
+
+Après la création, retirer les variables bootstrap du terminal lors du prochain redémarrage :
+
+```powershell
+Remove-Item Env:BOOTSTRAP_ADMIN_EMAIL -ErrorAction SilentlyContinue
+Remove-Item Env:BOOTSTRAP_ADMIN_PASSWORD -ErrorAction SilentlyContinue
 .\mvnw.cmd spring-boot:run
 ```
 
 Dans un second terminal :
 
 ```powershell
-cd frontend
+cd D:\rapport\frontend
 npm ci
 npm start
 ```
 
-Ouvrir <http://localhost:4200>, puis se connecter avec les identifiants définis ci-dessus. Angular transmet `/api` à Spring Boot sur le port 8080. Sous Linux/macOS, utiliser `export VARIABLE=...` et `bash mvnw spring-boot:run`.
+Ouvrir <http://localhost:4200>. Sous Linux/macOS, utiliser `export VARIABLE=...` et `bash mvnw spring-boot:run`.
 
-Le bootstrap crée un SUPER_ADMIN uniquement si son email n'existe pas. Retirer les variables bootstrap après la création. Il ne réinitialise pas un mot de passe BCrypt existant et ne change pas les rôles d'un compte existant. L'interface de création des autres comptes reste à développer ; les comptes existants doivent avoir un mot de passe BCrypt et les rôles COMMERCIAL, ADMIN ou SUPER_ADMIN (les anciens préfixes ROLE_ sont acceptés).
+## Mise à jour de la base du prototype
 
-## Base existante du prototype
+La migration V3 conserve les utilisateurs et rapports existants. Les anciens commerciaux n'ont pas d'équipe : les affecter via **Commerciaux**. Les anciens rapports restent identifiés « équipe non affectée » tant qu'un brouillon n'a pas été repris par son auteur ; aucune équipe n'est inventée pour l'historique.
 
-Sauvegarder la base avant la mise à jour. Flyway est maintenant réellement activé via le starter Spring Boot ; Hibernate vérifie le schéma au lieu de le modifier.
+Si les migrations V1/V2 fonctionnent déjà, démarrer normalement : V3 s'applique automatiquement. Ne pas modifier les migrations déjà exécutées.
 
-- Si `flyway_schema_history` existe, laisser Flyway appliquer les migrations normalement.
-- Si les tables existent sans historique Flyway, vérifier leur conformité avec `backend/src/main/resources/db/migration/V1__init_schema.sql`. Après sauvegarde et vérification seulement, démarrer une fois avec `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` et `SPRING_FLYWAY_BASELINE_VERSION=1`. Retirer ces variables ensuite. La migration V2 ajoute les rôles standards manquants sans supprimer les anciens.
-- Les anciens mots de passe en clair ne permettent plus de se connecter. Le plus simple pour démarrer est de créer un nouvel administrateur avec un **autre email** via le bootstrap. Une migration vers BCrypt est aussi possible via le bootstrap si le secret fourni correspond exactement à l'ancien mot de passe et respecte les nouvelles limites. Aucune donnée de rapport n'est supprimée par ces changements.
+Si les tables existent **sans** `flyway_schema_history`, sauvegarder la base et vérifier leur conformité avec `backend/src/main/resources/db/migration/V1__init_schema.sql`. Après cette vérification seulement, démarrer une fois avec :
+
+```powershell
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.flyway.baseline-on-migrate=true --spring.flyway.baseline-version=1"
+```
+
+Les anciens mots de passe en clair ne sont plus acceptés. Créer si nécessaire un nouvel administrateur avec un autre email via le bootstrap. Un mot de passe BCrypt existant n'est pas réinitialisé par le bootstrap.
+
+## Connexion aux applications mobiles
+
+Le connecteur est présent, mais reste désactivé sans configuration. Il faut une API **serveur à serveur** sur chaque application, protégée par clé, qui renvoie les statistiques **de la journée**, et non les compteurs cumulés. Le code de parrainage est renseigné par SUPER_ADMIN.
+
+Variables disponibles :
+
+| Équipe | Adresse de l'endpoint | Clé Bearer |
+| --- | --- | --- |
+| AZO | `AZO_STATS_URL` | `AZO_STATS_API_KEY` |
+| Zehami | `ZEHAMI_STATS_URL` | `ZEHAMI_STATS_API_KEY` |
+
+Requête envoyée par le backend :
+
+```http
+GET <endpoint-configuré>?referralCode=<code-du-compte>&date=2026-10-25
+Authorization: Bearer <clé-serveur>
+```
+
+Contrat JSON attendu (valeurs d'exemple uniquement) :
+
+```json
+{
+  "team": "AZO",
+  "referralCode": "CODE-001",
+  "date": "2026-10-25",
+  "prospectsContacted": 12,
+  "registrations": 3
+}
+```
+
+Le serveur mobile doit valider la clé et calculer les inscriptions attribuées au code pour cette journée, selon la même convention de date (Africa/Lagos). Si l'application mobile ne stocke pas les prospects contactés, son API devra être adaptée avec la définition métier choisie ; aucun chiffre manquant n'est fabriqué ici. Les clés ne sont jamais envoyées à Angular. Le backend valide l'équipe, le code, la date et les nombres ; un échec ou une configuration absente ne produit pas un faux bilan à zéro. Les données enregistrées sont des instantanés, avec date d'import, et ne changent pas quand les compteurs de l'application mobile évoluent.
+
+L'adaptation des backends AZO/Zehami et la fourniture des clés restent à faire avec leurs API réelles. HTTPS est obligatoire hors localhost. Les redirections ne sont pas suivies ; les requêtes ont des délais limités.
+
+## API
+
+| Méthode | Route | Accès / usage |
+| --- | --- | --- |
+| GET | `/api/auth/csrf` | Cookie CSRF |
+| POST | `/api/auth/register` | Inscription commerciale en attente |
+| POST | `/api/auth/login` | Form URL encodé : `email`, `password` |
+| GET / POST | `/api/auth/me`, `/api/auth/logout` | Profil / fin de session |
+| GET / POST | `/api/commercials` | SUPER_ADMIN : liste / création activée |
+| PUT | `/api/commercials/{id}` | SUPER_ADMIN : équipe, code, activation |
+| GET / POST | `/api/reports` | Rapports autorisés / création |
+| GET / PUT / DELETE | `/api/reports/{id}` | Lecture / modification de brouillon ou retour / suppression de brouillon |
+| POST | `/api/reports/{id}/review` | SUPER_ADMIN : action `RETURNED` ou `CONFIRMED`, commentaire et version |
+| GET | `/api/reports/{id}/pdf` | PDF avec les mêmes contrôles d'accès que la lecture |
+| GET | `/api/integrations/status`, `/api/integrations/my-stats?date=...` | Configuration / statistiques du compte connecté |
+
+POST, PUT et DELETE nécessitent le cookie de session et `X-XSRF-TOKEN`, géré par Angular pour les URL relatives. Un rapport accepte `title`, `content`, `mode` (`WRITTEN`/`STATS`), `reportDate`, `status` (`DRAFT`/`SUBMITTED`), les deux compteurs et `syncStats`. PUT et review nécessitent la `version` retournée par GET. L'auteur, la source vérifiée et l'équipe commerciale sont déterminés côté serveur.
 
 ## Vérifications
 
@@ -70,19 +141,18 @@ npm ci
 npm run build
 ```
 
-Les tests backend utilisent H2 en mode PostgreSQL et les migrations réelles : session, déconnexion, BCrypt, compte désactivé, CSRF cookies/rotation, usurpation d'auteur, isolation entre commerciaux, accès admin, validation et CRUD. La CI exécute ces vérifications avec Java 21 et Node 24. H2 ne remplace pas une recette sur PostgreSQL.
+Les tests couvrent sessions, CSRF, inscription en attente, activation, permissions, unicité des codes, transitions et conflits de version, origine des statistiques, contrat API mobile, accès et contenu des PDF et pagination. Les migrations V1/V2/V3 sont testées sur H2 en mode PostgreSQL.
 
-## API
+Sur Linux/CI avec Java 21, un test navigateur démarre automatiquement une base H2 isolée et teste l'interface réelle :
 
-| Méthode | Route | Usage |
-| --- | --- | --- |
-| GET | `/api/auth/csrf` | Initialise le cookie `XSRF-TOKEN` |
-| POST | `/api/auth/login` | Form URL encodé : `email`, `password` |
-| GET | `/api/auth/me` | Profil de la session, sans mot de passe |
-| POST | `/api/auth/logout` | Invalide la session |
-| GET / POST | `/api/reports` | Liste autorisée / création |
-| GET / PUT / DELETE | `/api/reports/{id}` | Consultation / modification / suppression |
+```bash
+cd frontend
+npm ci
+npm run build
+npx playwright install --with-deps chromium
+npm run test:smoke
+```
 
-Pour POST, PUT et DELETE, envoyer le cookie de session et l'en-tête `X-XSRF-TOKEN` correspondant au cookie CSRF. Recharger le jeton après connexion (rotation). Angular gère cet en-tête pour les URL relatives. JSON rapport : `title` (obligatoire, 200 caractères max), `content` (obligatoire, 50 000 max), `status` (`DRAFT` par défaut ou `SUBMITTED`).
+Ce test crée uniquement des comptes fictifs dans une base H2 en mémoire ; il n'utilise pas votre PostgreSQL. Les ports 8080 et 4200 doivent être libres. Le parcours couvre inscription, activation, création commerciale, rapport écrit sur mobile, retour, bilan chiffré, nouvelle soumission, confirmation, PDF et déconnexion, avec vérification des largeurs 360/390/768/1440 px.
 
-En déploiement, servir le frontend et `/api` sous la même origine via un reverse proxy, utiliser HTTPS et `SESSION_COOKIE_SECURE=true`, et fournir les secrets par l'environnement. Le bundle Angular seul ne contient pas le backend. La limitation des tentatives de connexion, la gestion des utilisateurs, la réinitialisation des mots de passe et la pagination restent à prévoir avant une ouverture publique.
+En déploiement, servir Angular et `/api` sous la même origine via reverse proxy, utiliser HTTPS et `SESSION_COOKIE_SECURE=true`, fournir les secrets par l'environnement. Le bundle Angular seul ne contient pas le backend. La réinitialisation des mots de passe, la pagination et la limitation des tentatives de connexion ne sont pas encore implémentées. Les images de marque fournies sont conservées ; la police PDF DejaVu est accompagnée de sa licence.

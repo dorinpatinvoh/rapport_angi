@@ -1,0 +1,474 @@
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">Votre activité terrain</p>
+    <h1>Rapports commerciaux</h1>
+    <p class="text-secondary">Une journée, un bilan clair pour ANGI DSN PRO.</p>
+  </div>
+  <button class="btn btn-primary" [disabled]="busy()" (click)="edit()">
+    <i aria-hidden="true" class="bi bi-plus-lg me-2"></i>Rédiger un rapport
+  </button>
+</div>
+@if (error()) {
+  <div class="alert alert-danger" role="alert">{{ error() }}</div>
+}
+@if (success()) {
+  <div class="alert alert-success" role="status">{{ success() }}</div>
+}
+@if (formVisible()) {
+  <section class="panel mb-4" id="report-form">
+    <div class="d-flex justify-content-between gap-2 mb-3">
+      <h2 class="h4">
+        {{ editing() ? "Compléter mon rapport" : "Nouveau rapport" }}
+      </h2>
+      <button
+        class="btn btn-outline-secondary"
+        [disabled]="busy()"
+        (click)="formVisible.set(false)"
+      >
+        Fermer
+      </button>
+    </div>
+    @if (editing()?.status === "RETURNED") {
+      <div class="alert alert-warning">
+        Le super administrateur attend votre confirmation ou vos corrections.
+        Consultez les commentaires dans le rapport.
+      </div>
+    }
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label for="reportTitle" class="form-label">Titre du rapport</label
+          ><input
+            id="reportTitle"
+            formControlName="title"
+            class="form-control"
+            maxlength="200"
+            placeholder="Ex. Prospection à Abomey-Calavi"
+            required
+          />
+        </div>
+        <div class="col-md-4">
+          <label for="reportDate" class="form-label">Journée concernée</label
+          ><input
+            id="reportDate"
+            formControlName="reportDate"
+            type="date"
+            [max]="today"
+            class="form-control"
+            required
+          />
+        </div>
+        @if (!auth.user()?.team && auth.isAdmin() && !editing()) {
+          <div class="col-12">
+            <label for="reportTeam" class="form-label">Équipe du rapport</label
+            ><select id="reportTeam" formControlName="team" class="form-select">
+              <option value="AZO">AZO</option>
+              <option value="ZEHAMI">Zehami</option>
+            </select>
+          </div>
+        } @else {
+          <div class="col-12">
+            <p class="team-note mb-0">
+              Équipe :
+              {{
+                editing()?.team ||
+                  auth.user()?.team ||
+                  "À affecter par le super administrateur"
+              }}
+            </p>
+          </div>
+        }
+        <div class="col-12">
+          <label for="reportMode" class="form-label"
+            >Comment souhaitez-vous faire votre bilan ?</label
+          ><select id="reportMode" formControlName="mode" class="form-select">
+            <option value="WRITTEN">Raconter ma journée par écrit</option>
+            <option value="STATS">
+              Présenter mes statistiques et ajouter des observations
+            </option>
+          </select>
+        </div>
+        @if (form.controls.mode.value === "STATS") {
+          <div class="col-12">
+            <div class="stats-box">
+              @if (integrationReady()) {
+                <label class="d-flex gap-2 mb-3"
+                  ><input
+                    type="checkbox"
+                    formControlName="syncStats"
+                    class="form-check-input"
+                  />Importer les chiffres depuis mon application mobile</label
+                >
+              } @else {
+                <p class="small text-secondary">
+                  La connexion à l'application mobile n'est pas encore
+                  configurée. Les chiffres saisis seront identifiés comme
+                  déclaratifs.
+                </p>
+              }
+              @if (form.controls.syncStats.value) {
+                <button
+                  type="button"
+                  class="btn btn-outline-primary mb-3"
+                  [disabled]="busy()"
+                  (click)="previewStats()"
+                >
+                  Consulter mes statistiques
+                </button>
+                <p class="small">
+                  L'API sera interrogée de nouveau à l'enregistrement, pour
+                  votre code de parrainage et la journée choisie.
+                </p>
+              }
+              <div class="row g-3">
+                <div class="col-sm-6">
+                  <label for="prospects" class="form-label"
+                    >Prospects contactés</label
+                  ><input
+                    id="prospects"
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    max="1000000"
+                    step="1"
+                    class="form-control"
+                    formControlName="prospectsContacted"
+                    [readonly]="form.controls.syncStats.value"
+                  />
+                </div>
+                <div class="col-sm-6">
+                  <label for="registrations" class="form-label"
+                    >Inscriptions attribuées</label
+                  ><input
+                    id="registrations"
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    max="1000000"
+                    step="1"
+                    class="form-control"
+                    formControlName="registrations"
+                    [readonly]="form.controls.syncStats.value"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+        <div class="col-12">
+          <label for="reportContent" class="form-label">{{
+            form.controls.mode.value === "STATS"
+              ? "Observations (facultatif)"
+              : "Déroulement de la journée"
+          }}</label
+          ><textarea
+            id="reportContent"
+            class="form-control"
+            rows="8"
+            maxlength="50000"
+            formControlName="content"
+            [required]="form.controls.mode.value === 'WRITTEN'"
+            placeholder="Zones visitées, besoins des prospects, difficultés, résultats et prochaines actions…"
+          ></textarea>
+        </div>
+        <div class="col-12">
+          <label for="reportStatus" class="form-label">Enregistrement</label
+          ><select
+            id="reportStatus"
+            class="form-select"
+            formControlName="status"
+          >
+            <option value="DRAFT">Garder en brouillon</option>
+            <option value="SUBMITTED">Soumettre au super administrateur</option>
+          </select>
+          <p class="form-text">
+            Après soumission, le contenu est verrouillé jusqu'à un éventuel
+            retour pour confirmation.
+          </p>
+        </div>
+      </div>
+      <button
+        type="submit"
+        class="btn btn-primary mt-3 w-mobile"
+        [disabled]="form.invalid || busy()"
+      >
+        {{ busy() ? "Enregistrement…" : "Enregistrer le rapport" }}
+      </button>
+    </form>
+  </section>
+}
+@if (detail(); as r) {
+  <article class="panel mb-4" id="report-detail">
+    <div class="detail-letterhead">
+      <img
+        src="/api/branding/angi.jpeg"
+        alt="ANGI DSN PRO SARL"
+        class="company-logo"
+      />
+      <div>
+        <p class="eyebrow mb-1">ANGI DSN PRO SARL</p>
+        <p class="text-secondary mb-0">Rapport d'activité commerciale</p>
+      </div>
+      @if (r.team) {
+        <div class="team-logo" [class.zehami]="r.team === 'ZEHAMI'">
+          <img
+            [src]="
+              r.team === 'AZO'
+                ? '/api/branding/azo.png'
+                : '/api/branding/zehami.jpeg'
+            "
+            [alt]="r.team"
+          />
+        </div>
+      }
+    </div>
+    <div class="d-flex justify-content-between flex-wrap gap-3 mt-4">
+      <div>
+        <span class="badge report-status" [attr.data-status]="r.status">{{
+          label(r.status)
+        }}</span>
+        <h2 class="h3 mt-3">{{ r.title }}</h2>
+      </div>
+      <button
+        class="btn btn-outline-secondary align-self-start"
+        (click)="detail.set(null)"
+      >
+        Fermer la lecture
+      </button>
+    </div>
+    <dl class="report-meta">
+      <div>
+        <dt>Commercial</dt>
+        <dd>{{ r.authorName }}</dd>
+      </div>
+      <div>
+        <dt>Équipe</dt>
+        <dd>{{ r.team || "Non affectée (ancien rapport)" }}</dd>
+      </div>
+      <div>
+        <dt>Journée</dt>
+        <dd>{{ r.reportDate | date: "dd/MM/yyyy" }}</dd>
+      </div>
+      <div>
+        <dt>Code de parrainage</dt>
+        <dd>{{ r.referralCode || "Non renseigné" }}</dd>
+      </div>
+    </dl>
+    @if (r.mode === "STATS") {
+      <div class="stats-box mb-4">
+        <div class="row">
+          <div class="col-6">
+            <span class="metric">{{ r.prospectsContacted }}</span>
+            <p>Prospects contactés</p>
+          </div>
+          <div class="col-6">
+            <span class="metric">{{ r.registrations }}</span>
+            <p>Inscriptions attribuées</p>
+          </div>
+        </div>
+        <p class="small mb-0">
+          {{
+            r.statsSource === "APP_API"
+              ? "Source : API mobile de l’équipe."
+              : "Source : chiffres déclarés par le commercial, non vérifiés par une API."
+          }}
+          @if (r.statsFetchedAt) {
+            Importé le {{ r.statsFetchedAt | date: "dd/MM/yyyy HH:mm" }}.
+          }
+        </p>
+      </div>
+    }
+    <h3 class="h5">
+      {{ r.mode === "STATS" ? "Observations" : "Déroulement de la journée" }}
+    </h3>
+    <p class="report-body">{{ r.content || "Aucune observation ajoutée." }}</p>
+    @if (r.reviews.length) {
+      <section class="mt-4">
+        <h3 class="h5">Suivi et confirmation</h3>
+        @for (v of r.reviews; track $index) {
+          <div class="review-note">
+            <strong>{{ label(v.action) }} · {{ v.reviewerName }}</strong>
+            <p class="small text-secondary">
+              {{ v.createdAt | date: "dd/MM/yyyy HH:mm" }}
+            </p>
+            <p class="report-body mb-0">
+              {{ v.comment || "Rapport confirmé." }}
+            </p>
+          </div>
+        }
+      </section>
+    }
+    <div class="d-flex flex-wrap gap-2 mt-4">
+      <button class="btn btn-primary" [disabled]="busy()" (click)="download(r)">
+        <i aria-hidden="true" class="bi bi-file-earmark-pdf me-2"></i
+        >Télécharger le PDF
+      </button>
+      @if (canEdit(r)) {
+        <button
+          class="btn btn-outline-primary"
+          [disabled]="busy()"
+          (click)="edit(r)"
+        >
+          Corriger / compléter
+        </button>
+      }
+    </div>
+    @if (canReview(r)) {
+      <section class="review-box mt-4">
+        <h3 class="h5">Examen du super administrateur</h3>
+        <label for="reviewComment" class="form-label"
+          >Commentaire ou informations à confirmer</label
+        ><textarea
+          #comment
+          id="reviewComment"
+          rows="4"
+          maxlength="3000"
+          class="form-control mb-3"
+        ></textarea>
+        <div class="d-flex flex-wrap gap-2">
+          <button
+            class="btn btn-outline-primary"
+            [disabled]="busy()"
+            (click)="review(r, 'RETURNED', comment.value)"
+          >
+            Renvoyer pour confirmation</button
+          ><button
+            class="btn btn-primary"
+            [disabled]="busy()"
+            (click)="review(r, 'CONFIRMED', comment.value)"
+          >
+            Confirmer le rapport
+          </button>
+        </div>
+      </section>
+    }
+  </article>
+}
+<section aria-label="Historique des rapports">
+  <div
+    class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3"
+  >
+    <h2 class="h4 mb-0">Historique</h2>
+    <button
+      class="btn btn-outline-primary"
+      [disabled]="loading() || busy()"
+      (click)="load(true)"
+    >
+      Actualiser
+    </button>
+  </div>
+  <div class="panel mb-3">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label for="search" class="form-label">Rechercher</label
+        ><input
+          #search
+          id="search"
+          type="search"
+          class="form-control"
+          placeholder="Titre, contenu ou commercial"
+          (input)="query.set(search.value)"
+        />
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <label for="filterStatus" class="form-label">Statut</label
+        ><select
+          #filterStatus
+          id="filterStatus"
+          class="form-select"
+          (change)="statusFilter.set(filterStatus.value)"
+        >
+          <option value="">Tous</option>
+          <option value="DRAFT">Brouillon</option>
+          <option value="SUBMITTED">Soumis</option>
+          <option value="RETURNED">À confirmer</option>
+          <option value="CONFIRMED">Confirmé</option>
+        </select>
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <label for="filterTeam" class="form-label">Équipe</label
+        ><select
+          #filterTeam
+          id="filterTeam"
+          class="form-select"
+          (change)="teamFilter.set(filterTeam.value)"
+        >
+          <option value="">Toutes</option>
+          <option value="AZO">AZO</option>
+          <option value="ZEHAMI">Zehami</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  @if (loading()) {
+    <p role="status">Chargement des rapports…</p>
+  } @else {
+    <div class="report-grid">
+      @for (r of filtered(); track r.id) {
+        <article class="panel report-card">
+          <div class="d-flex justify-content-between gap-2">
+            <span class="team-pill">{{ r.team || "ANGI" }}</span
+            ><span class="badge report-status" [attr.data-status]="r.status">{{
+              label(r.status)
+            }}</span>
+          </div>
+          <h3 class="h5 mt-3">{{ r.title }}</h3>
+          <p class="text-secondary mb-1">{{ r.authorName }}</p>
+          <p class="small text-secondary">
+            {{ r.reportDate | date: "dd/MM/yyyy" }} ·
+            {{ r.mode === "STATS" ? "Bilan chiffré" : "Compte rendu écrit" }}
+          </p>
+          <div class="card-actions">
+            <button class="btn btn-primary" (click)="read(r)">
+              Lire le rapport</button
+            ><button
+              class="btn btn-outline-primary"
+              [disabled]="busy()"
+              (click)="download(r)"
+            >
+              PDF
+            </button>
+            @if (canEdit(r)) {
+              <button
+                class="btn btn-outline-secondary"
+                [disabled]="busy()"
+                (click)="edit(r)"
+              >
+                Modifier
+              </button>
+            }
+            @if (r.status === "DRAFT") {
+              <button
+                class="btn btn-outline-danger"
+                [disabled]="busy()"
+                (click)="pendingDelete.set(r)"
+              >
+                Supprimer
+              </button>
+            }
+          </div>
+        </article>
+      } @empty {
+        <div class="panel empty">Aucun rapport à afficher.</div>
+      }
+    </div>
+  }
+  @if (pendingDelete(); as r) {
+    <div class="alert alert-warning mt-3" role="alert">
+      <p>Supprimer définitivement le brouillon « {{ r.title }} » ?</p>
+      <button
+        class="btn btn-danger me-2"
+        [disabled]="busy()"
+        (click)="remove(r)"
+      >
+        Confirmer la suppression</button
+      ><button
+        class="btn btn-outline-secondary"
+        [disabled]="busy()"
+        (click)="pendingDelete.set(null)"
+      >
+        Annuler
+      </button>
+    </div>
+  }
+</section>
