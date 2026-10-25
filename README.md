@@ -176,7 +176,7 @@ $env:APP_PUBLIC_URL = "http://localhost:4200"
 
 Ces adresses sont des exemples à remplacer. En ligne, `APP_PUBLIC_URL` doit être l'adresse HTTPS réelle du frontend, sans paramètre ni fragment. Par défaut SMTP utilise authentification et STARTTLS (port 587). Pour le port 465, utiliser `SMTP_SSL=true` et `SMTP_STARTTLS=false` selon le fournisseur. Redémarrer le backend après configuration. Aucun fournisseur email réel n'est configuré par cette mise à jour et aucun email utilisateur n'a été envoyé pendant les tests.
 
-Sans SMTP, le formulaire indique que l'envoi est indisponible. Le SUPER_ADMIN peut néanmoins ouvrir **Commerciaux > [compte] > Réinitialiser le mot de passe**, saisir et confirmer le nouveau mot de passe, puis le transmettre personnellement. Cette assistance ne permet pas de réinitialiser un compte administrateur ; pour le mot de passe oublié du SUPER_ADMIN, configurer l'email.
+Sans SMTP, le formulaire indique que l'envoi est indisponible. Le SUPER_ADMIN peut néanmoins ouvrir **Commerciaux > [compte] > Réinitialiser le mot de passe**, saisir et confirmer le nouveau mot de passe, puis le transmettre personnellement. Cette assistance ne permet pas de réinitialiser un compte administrateur depuis le navigateur. Le SUPER_ADMIN peut utiliser le lien email ou la procédure locale ci-dessous.
 
 API : POST `/api/auth/forgot-password` avec `{email}`, POST `/api/auth/reset-password` avec `{token,password}`, et POST `/api/commercials/{id}/password` avec `{password}` (SUPER_ADMIN). Ces écritures restent protégées par CSRF.
 
@@ -189,3 +189,31 @@ En mode statistiques AZO, cocher **Détailler les profils AZO**, puis renseigner
 La répartition est conservée dans le rapport et reprise dans la lecture et le PDF. Les anciens rapports restent sans répartition, explicitement indiquée comme non fournie. L'API des profils est GET `/api/report-profiles`. Les créations/modifications acceptent `profileCounts`, objet dont les clés sont les codes renvoyés par cette API et les valeurs des entiers entre 0 et 1 000 000.
 
 Le contrat des API mobiles peut aussi fournir `profileCounts`, par exemple `{"CLIENT":4,"SPEEDER_MOTO_ESSENCE":2,"AGENCE_PRO":1}`. Une répartition absente n'est jamais transformée en chiffres vérifiés à zéro. Avec l'import actif, seule la répartition renvoyée par l'API est enregistrée ; les valeurs du navigateur sont ignorées. La migration V4 ajoute ces compteurs et la réinitialisation sans effacer les données.
+
+
+## Récupérer localement le compte SUPER_ADMIN sans email
+
+Cette procédure nécessite l'accès au serveur et à sa configuration de base de données. Elle agit uniquement sur un SUPER_ADMIN actif déjà existant ; une erreur d'email ne crée pas de nouveau compte.
+
+Arrêter le backend, puis dans PowerShell :
+
+```powershell
+cd D:\rapport
+git pull origin main
+cd backend
+$env:BOOTSTRAP_ADMIN_EMAIL = "email-exact-du-super-admin"
+$secret = Read-Host "Nouveau mot de passe (12 à 72 caractères ASCII)" -AsSecureString
+$env:BOOTSTRAP_ADMIN_PASSWORD = [System.Net.NetworkCredential]::new("", $secret).Password
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--app.bootstrap.reset-password=true"
+```
+
+Attendre le message **Mot de passe SUPER_ADMIN réinitialisé**. Arrêter ensuite le backend avec Ctrl+C, retirer les variables et redémarrer normalement :
+
+```powershell
+Remove-Item Env:BOOTSTRAP_ADMIN_EMAIL -ErrorAction SilentlyContinue
+Remove-Item Env:BOOTSTRAP_ADMIN_PASSWORD -ErrorAction SilentlyContinue
+Remove-Item Env:BOOTSTRAP_ADMIN_RESET_PASSWORD -ErrorAction SilentlyContinue
+.\mvnw.cmd spring-boot:run
+```
+
+Le nouveau mot de passe est haché avec BCrypt. Les anciennes sessions et les anciens liens de réinitialisation deviennent invalides. L'option est désactivée par défaut et aucun endpoint public ne permet cette récupération locale.
