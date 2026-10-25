@@ -1,11 +1,9 @@
-# Frontend ANGI
+# Frontend Angular
 
-Angular 20 + Bootstrap 5.
+Voir le README à la racine pour le démarrage complet et les identifiants bootstrap.
 
-```bash
-cd frontend
-npm install
-npm start
-```
+- `npm ci` : installer les versions verrouillées.
+- `npm start` : ouvrir http://localhost:4200 ; proxy `/api` vers localhost:8080.
+- `npm run build` : générer `dist/frontend/browser`.
 
-Naviguer vers http://localhost:4200. L'API Spring Boot cible est localhost:8080. L'authentification et la création de rapports ne sont pas activées tant que le backend ne fournit pas de sécurité serveur. Les statistiques sont des espaces réservés.
+L'API est nécessaire : session HTTP et protection CSRF, sans stockage du mot de passe ou de jeton d'authentification dans localStorage.

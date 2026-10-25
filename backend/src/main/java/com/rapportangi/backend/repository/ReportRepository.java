@@ -9,5 +9,5 @@ import java.util.List;
 @Repository
 public interface ReportRepository extends JpaRepository<Report, Long> {
     // Permet de récupérer tous les rapports créés par un utilisateur spécifique
-    List<Report> findByAuthorId(Long authorId);
+    List<Report> findByAuthorIdOrderByCreatedAtDesc(Long authorId);
 }

@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: rapport_angi
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Définissez DB_PASSWORD avant de démarrer}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - rapport_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rapport_angi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  rapport_db:

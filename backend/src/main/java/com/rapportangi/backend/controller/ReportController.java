@@ -1,48 +1,29 @@
 package com.rapportangi.backend.controller;
 
-import com.rapportangi.backend.dto.ReportRequestDto;
-import com.rapportangi.backend.dto.ReportResponseDto;
+import com.rapportangi.backend.dto.*;
 import com.rapportangi.backend.service.ReportService;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import jakarta.validation.Valid;
+import org.springframework.http.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/reports")
-@CrossOrigin(origins = "*") // Permet à n'importe quel front-end de faire des requêtes sans blocage CORS
 public class ReportController {
-
-    private final ReportService reportService;
-
-    public ReportController(ReportService reportService) {
-        this.reportService = reportService;
+    private final ReportService reports;
+    public ReportController(ReportService reports) { this.reports = reports; }
+    @GetMapping public List<ReportResponseDto> list(Authentication auth) { return reports.getAllReports(auth); }
+    @GetMapping("/{id}") public ReportResponseDto get(@PathVariable Long id, Authentication auth) {
+        return reports.getReportById(id, auth);
     }
-
-    // GET /api/reports : Récupérer tous les rapports
-    @GetMapping
-    public ResponseEntity<List<ReportResponseDto>> getAllReports() {
-        return ResponseEntity.ok(reportService.getAllReports());
+    @PostMapping public ResponseEntity<ReportResponseDto> create(@Valid @RequestBody ReportRequestDto request, Authentication auth) {
+        var created = reports.createReport(request, auth);
+        return ResponseEntity.created(java.net.URI.create("/api/reports/" + created.getId())).body(created);
     }
-
-    // GET /api/reports/{id} : Récupérer un rapport par son ID
-    @GetMapping("/{id}")
-    public ResponseEntity<ReportResponseDto> getReportById(@PathVariable Long id) {
-        return ResponseEntity.ok(reportService.getReportById(id));
-    }
-
-    // POST /api/reports : Créer un nouveau rapport
-    @PostMapping
-    public ResponseEntity<ReportResponseDto> createReport(@RequestBody ReportRequestDto requestDto) {
-        ReportResponseDto createdReport = reportService.createReport(requestDto);
-        return new ResponseEntity<>(createdReport, HttpStatus.CREATED);
-    }
-
-    // DELETE /api/reports/{id} : Supprimer un rapport
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteReport(@PathVariable Long id) {
-        reportService.deleteReport(id);
-        return ResponseEntity.noContent().build();
+    @PutMapping("/{id}") public ReportResponseDto update(@PathVariable Long id,
+            @Valid @RequestBody ReportRequestDto request, Authentication auth) { return reports.updateReport(id, request, auth); }
+    @DeleteMapping("/{id}") public ResponseEntity<Void> delete(@PathVariable Long id, Authentication auth) {
+        reports.deleteReport(id, auth); return ResponseEntity.noContent().build();
     }
 }
