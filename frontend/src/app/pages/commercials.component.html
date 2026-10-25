@@ -147,6 +147,47 @@
           </button>
         }
       </div>
+      <details class="mt-4">
+        <summary>Réinitialiser le mot de passe</summary>
+        <div class="mt-3">
+          <label [for]="'reset-' + u.id" class="form-label"
+            >Nouveau mot de passe (12 à 72 caractères)</label
+          ><input
+            #newPass
+            [id]="'reset-' + u.id"
+            type="password"
+            autocomplete="new-password"
+            minlength="12"
+            maxlength="72"
+            class="form-control mb-3"
+          />
+          <label [for]="'confirm-' + u.id" class="form-label"
+            >Confirmation</label
+          ><input
+            #confirmPass
+            [id]="'confirm-' + u.id"
+            type="password"
+            autocomplete="new-password"
+            class="form-control mb-3"
+          />
+          <button
+            type="button"
+            class="btn btn-outline-primary"
+            [disabled]="busy()"
+            (click)="
+              resetPassword(u, newPass.value, confirmPass.value);
+              newPass.value = '';
+              confirmPass.value = ''
+            "
+          >
+            Changer le mot de passe
+          </button>
+          <p class="form-text">
+            Transmettez personnellement le nouveau mot de passe au commercial.
+            Ses anciennes sessions seront invalidées.
+          </p>
+        </div>
+      </details>
     </article>
   } @empty {
     <div class="panel empty">Aucun commercial inscrit pour le moment.</div>

@@ -376,7 +376,7 @@ class CommercialReportingTests {
         assertTrue(
           text.contains(email.startsWith("seller") ? "AZO" : "ZEHAMI")
         );
-        assertTrue(text.contains("Inscriptions attribuées : 3"));
+        assertTrue(text.contains("Comptes inscrits (uniques) : 3"));
         assertTrue(text.contains("Démonstration"));
       }
       if (Boolean.getBoolean("pdf.qa")) Files.write(
@@ -422,5 +422,67 @@ class CommercialReportingTests {
       Path.of("/tmp/rapport-long.pdf"),
       bytes
     );
+  }
+
+  @Test
+  void azoBreakdownSurvivesReadingAndPdfWithoutReplacingUniqueAccounts()
+    throws Exception {
+    String profileJson =
+      com.rapportangi.backend.service.AzoProfiles.ALL.stream()
+        .map(p -> "\"" + p.code() + "\":1")
+        .collect(java.util.stream.Collectors.joining(","));
+    String data =
+      "{\"title\":\"Bilan profils\",\"mode\":\"STATS\",\"registrations\":2,\"profileCounts\":{" +
+      profileJson +
+      "}}";
+    mvc
+      .perform(
+        post("/api/reports")
+          .with(user("seller@test.com").roles("COMMERCIAL"))
+          .with(csrf())
+          .contentType("application/json")
+          .content(data)
+      )
+      .andExpect(status().isCreated())
+      .andExpect(jsonPath("$.registrations").value(2))
+      .andExpect(jsonPath("$.profileCounts.SPEEDER_MOTO_ESSENCE").value(1));
+    var id = reports.findAll().get(0).getId();
+    byte[] bytes = mvc
+      .perform(
+        get("/api/reports/" + id + "/pdf").with(
+          user("seller@test.com").roles("COMMERCIAL")
+        )
+      )
+      .andExpect(status().isOk())
+      .andReturn()
+      .getResponse()
+      .getContentAsByteArray();
+    try (var doc = org.apache.pdfbox.Loader.loadPDF(bytes)) {
+      String text = new org.apache.pdfbox.text.PDFTextStripper().getText(doc);
+      assertTrue(text.contains("Speeder moto à essence : 1"));
+      assertTrue(text.contains("Comptes inscrits (uniques) : 2"));
+    }
+    if (Boolean.getBoolean("pdf.qa")) Files.write(
+      Path.of("/tmp/rapport-profiles.pdf"),
+      bytes
+    );
+    mvc
+      .perform(
+        post("/api/reports")
+          .with(user("seller@test.com").roles("COMMERCIAL"))
+          .with(csrf())
+          .contentType("application/json")
+          .content(data.replace("SPEEDER_MOTO_ESSENCE", "UNKNOWN"))
+      )
+      .andExpect(status().isBadRequest());
+    mvc
+      .perform(
+        post("/api/reports")
+          .with(user("zehami@test.com").roles("COMMERCIAL"))
+          .with(csrf())
+          .contentType("application/json")
+          .content(data)
+      )
+      .andExpect(status().isBadRequest());
   }
 }

@@ -65,7 +65,7 @@ public class ReportPdfService {
           Color.BLACK
         );
         layout.text(
-          "Inscriptions attribuées : " + report.getRegistrations(),
+          "Comptes inscrits (uniques) : " + report.getRegistrations(),
           12,
           Color.BLACK
         );
@@ -83,6 +83,34 @@ public class ReportPdfService {
               .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),
           10,
           new Color(91, 91, 105)
+        );
+        layout.space(16);
+      }
+      if ("STATS".equals(report.getMode()) && "AZO".equals(report.getTeam())) {
+        layout.text(
+          "PROFILS AZO ENREGISTRÉS / ACTIVÉS",
+          12,
+          new Color(89, 22, 129)
+        );
+        if (
+          report.getProfileCounts() == null ||
+          report.getProfileCounts().isEmpty()
+        ) layout.text("Répartition non fournie.", 10, Color.DARK_GRAY);
+        else for (var profile : AzoProfiles.ALL) {
+          if (
+            report.getProfileCounts().containsKey(profile.code())
+          ) layout.text(
+            profile.label() +
+              " : " +
+              report.getProfileCounts().get(profile.code()),
+            11,
+            Color.BLACK
+          );
+        }
+        layout.text(
+          "Un compte peut activer plusieurs profils : leur somme n'est pas le nombre de comptes uniques.",
+          9,
+          Color.DARK_GRAY
         );
         layout.space(16);
       }

@@ -222,6 +222,7 @@ public class ReportService {
     r.setStatsSource("DECLARED");
     r.setStatsFetchedAt(null);
     r.setReferralCode(user.getReferralCode());
+    r.getProfileCounts().clear();
     if (request.getMode().equals("STATS")) {
       if (request.getSyncStats()) {
         if (!r.getTeam().equals(user.getTeam())) throw error(
@@ -229,6 +230,9 @@ public class ReportService {
           "Le compte doit être affecté à cette équipe pour importer ses statistiques."
         );
         var stats = mobile.fetch(user, r.getReportDate());
+        r.getProfileCounts().putAll(
+          AzoProfiles.validate(stats.profileCounts(), r.getTeam())
+        );
         r.setProspectsContacted(stats.prospectsContacted());
         r.setRegistrations(stats.registrations());
         r.setStatsSource("APP_API");
@@ -236,6 +240,9 @@ public class ReportService {
           LocalDateTime.now(java.time.ZoneId.of("Africa/Lagos"))
         );
       } else {
+        r.getProfileCounts().putAll(
+          AzoProfiles.validate(request.getProfileCounts(), r.getTeam())
+        );
         r.setProspectsContacted(request.getProspectsContacted());
         r.setRegistrations(request.getRegistrations());
       }
@@ -254,6 +261,7 @@ public class ReportService {
     d.setAuthorName(
       r.getAuthor().getFirstName() + " " + r.getAuthor().getLastName()
     );
+    d.setProfileCounts(new java.util.TreeMap<>(r.getProfileCounts()));
     d.setTeam(r.getTeam());
     d.setReportDate(r.getReportDate());
     d.setMode(r.getMode());

@@ -1,10 +1,17 @@
 import { Component, computed, inject, signal } from "@angular/core";
 import { DatePipe } from "@angular/common";
 import { HttpClient } from "@angular/common/http";
-import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
+import {
+  FormBuilder,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
+} from "@angular/forms";
 import { finalize, switchMap } from "rxjs";
 import { AuthService } from "../core/auth.service";
 import {
+  AzoProfile,
   apiError,
   Report,
   ReportService,
@@ -83,9 +90,56 @@ export class ReportsComponent {
         Validators.pattern(/^\d+$/),
       ],
     ],
+    detailProfiles: [true],
     syncStats: [false],
   });
+  readonly profileDefs = signal<AzoProfile[]>([]);
+  readonly profileGroups = computed(() => [
+    ...new Set(this.profileDefs().map((p) => p.group)),
+  ]);
+  readonly profileForm = new FormGroup<Record<string, FormControl<number>>>({});
+  isAzo() {
+    return (
+      (this.editing()?.team ??
+        this.auth.user()?.team ??
+        this.form.controls.team.value) === "AZO"
+    );
+  }
+  groupProfiles(group: string) {
+    return this.profileDefs().filter((p) => p.group === group);
+  }
+  hasProfiles(r: Report) {
+    return Object.keys(r.profileCounts || {}).length > 0;
+  }
+  profileTotal(r: Report) {
+    return Object.values(r.profileCounts || {}).reduce((a, b) => a + b, 0);
+  }
   constructor() {
+    this.http.get<AzoProfile[]>("/api/report-profiles").subscribe({
+      next: (defs) => {
+        this.profileDefs.set(defs);
+        for (const p of defs)
+          this.profileForm.addControl(
+            p.code,
+            new FormControl(0, {
+              nonNullable: true,
+              validators: [
+                Validators.required,
+                Validators.min(0),
+                Validators.max(1000000),
+                Validators.pattern(/^\d+$/),
+              ],
+            }),
+          );
+        const selected = this.editing();
+        if (selected?.profileCounts)
+          this.profileForm.patchValue(selected.profileCounts);
+      },
+      error: () =>
+        this.error.set(
+          "Impossible de charger les profils AZO. Actualisez avant de détailler les profils.",
+        ),
+    });
     this.load();
     this.http
       .get<{ configured: boolean }>("/api/integrations/status")
@@ -141,8 +195,11 @@ export class ReportsComponent {
       mode: r?.mode ?? "WRITTEN",
       prospectsContacted: r?.prospectsContacted ?? 0,
       registrations: r?.registrations ?? 0,
+      detailProfiles: !r || Object.keys(r.profileCounts || {}).length > 0,
       syncStats: false,
     });
+    this.profileForm.reset();
+    if (r?.profileCounts) this.profileForm.patchValue(r.profileCounts);
     this.formVisible.set(true);
     this.detail.set(null);
     this.error.set("");
@@ -150,9 +207,22 @@ export class ReportsComponent {
     this.jump("report-form");
   }
   save() {
-    if (this.form.invalid || this.busy()) return;
+    if (
+      this.form.invalid ||
+      this.busy() ||
+      (this.isAzo() &&
+        this.form.controls.detailProfiles.value &&
+        this.profileForm.invalid)
+    )
+      return;
     const data = {
       ...this.form.getRawValue(),
+      profileCounts:
+        this.isAzo() &&
+        this.form.controls.mode.value === "STATS" &&
+        this.form.controls.detailProfiles.value
+          ? this.profileForm.getRawValue()
+          : {},
       version: this.editing()?.version ?? null,
     };
     if (data.mode === "WRITTEN" && !data.content.trim()) {
@@ -191,14 +261,21 @@ export class ReportsComponent {
     this.busy.set(true);
     this.error.set("");
     this.http
-      .get<{ prospectsContacted: number; registrations: number }>(
-        "/api/integrations/my-stats",
-        { params: { date: this.form.controls.reportDate.value } },
-      )
+      .get<{
+        prospectsContacted: number;
+        registrations: number;
+        profileCounts?: Record<string, number>;
+      }>("/api/integrations/my-stats", {
+        params: { date: this.form.controls.reportDate.value },
+      })
       .pipe(finalize(() => this.busy.set(false)))
       .subscribe({
         next: (r) => {
+          this.profileForm.reset();
+          if (r.profileCounts) this.profileForm.patchValue(r.profileCounts);
           this.form.patchValue({
+            detailProfiles:
+              !!r.profileCounts && Object.keys(r.profileCounts).length > 0,
             prospectsContacted: r.prospectsContacted,
             registrations: r.registrations,
           });

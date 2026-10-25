@@ -46,6 +46,9 @@ import { AuthService } from "../core/auth.service";
       <p class="text-center mt-3 mb-0">
         Nouveau commercial ? <a routerLink="/inscription">Créer mon compte</a>
       </p>
+      <a routerLink="/mot-de-passe-oublie" class="d-block text-center mt-3"
+        >Mot de passe oublié ?</a
+      >
     </form>
   </div>`,
 })

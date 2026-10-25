@@ -6,7 +6,13 @@ export interface Review {
   reviewerName: string;
   createdAt: string;
 }
+export interface AzoProfile {
+  code: string;
+  label: string;
+  group: string;
+}
 export interface Report {
+  profileCounts: Record<string, number>;
   id: number;
   title: string;
   content: string;
@@ -27,6 +33,7 @@ export interface Report {
   reviews: Review[];
 }
 export interface ReportInput {
+  profileCounts: Record<string, number>;
   title: string;
   content: string;
   status: string;

@@ -26,25 +26,20 @@ public class SecurityConfig {
       var user = users
         .findByEmailIgnoreCase(email.strip())
         .orElseThrow(() -> new UsernameNotFoundException("Compte introuvable"));
-      return org.springframework.security.core.userdetails.User.withUsername(
-        user.getEmail()
-      )
-        .password(user.getPassword())
-        .disabled(!user.isEnabled())
-        .authorities(
-          user
-            .getRoles()
-            .stream()
-            .map(role -> "ROLE_" + role.getName().replaceFirst("^ROLE_", ""))
-            .toArray(String[]::new)
-        )
-        .build();
+      return new SessionAccount(user);
     };
   }
 
   @Bean
-  SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+  SecurityFilterChain securityFilterChain(
+    HttpSecurity http,
+    UserRepository users
+  ) throws Exception {
     return http
+      .addFilterAfter(
+        new SessionAccountFilter(users),
+        org.springframework.security.web.context.SecurityContextHolderFilter.class
+      )
       .csrf(csrf ->
         csrf
           .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
@@ -56,6 +51,8 @@ public class SecurityConfig {
             "/api/auth/csrf",
             "/api/auth/login",
             "/api/auth/register",
+            "/api/auth/forgot-password",
+            "/api/auth/reset-password",
             "/api/branding/**",
             "/error"
           )

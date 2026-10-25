@@ -155,4 +155,37 @@ npm run test:smoke
 
 Ce test crée uniquement des comptes fictifs dans une base H2 en mémoire ; il n'utilise pas votre PostgreSQL. Les ports 8080 et 4200 doivent être libres. Le parcours couvre inscription, activation, création commerciale, rapport écrit sur mobile, retour, bilan chiffré, nouvelle soumission, confirmation, PDF et déconnexion, avec vérification des largeurs 360/390/768/1440 px.
 
-En déploiement, servir Angular et `/api` sous la même origine via reverse proxy, utiliser HTTPS et `SESSION_COOKIE_SECURE=true`, fournir les secrets par l'environnement. Le bundle Angular seul ne contient pas le backend. La réinitialisation des mots de passe, la pagination et la limitation des tentatives de connexion ne sont pas encore implémentées. Les images de marque fournies sont conservées ; la police PDF DejaVu est accompagnée de sa licence.
+En déploiement, servir Angular et `/api` sous la même origine via reverse proxy, utiliser HTTPS et `SESSION_COOKIE_SECURE=true`, fournir les secrets par l'environnement. Le bundle Angular seul ne contient pas le backend. La pagination et la limitation générale des tentatives de connexion ne sont pas encore implémentées. Les demandes de lien de réinitialisation sont espacées d’au moins une minute par email sur chaque instance. Les images de marque fournies sont conservées ; la police PDF DejaVu est accompagnée de sa licence.
+
+
+## Mot de passe oublié
+
+Le lien **Mot de passe oublié ?** est disponible sur la connexion. L'utilisateur reçoit un lien valable 30 minutes, utilisable une fois, et choisit son nouveau mot de passe. La réponse ne confirme pas l'existence d'un compte. Le jeton aléatoire est stocké uniquement sous forme d'empreinte SHA-256 ; le changement du mot de passe invalide les anciennes sessions. Un compte inactif reste inactif.
+
+Pour activer l'envoi, configurer les variables SMTP dans le terminal qui démarre le backend :
+
+```powershell
+$env:SMTP_HOST = "adresse-smtp-de-votre-fournisseur"
+$env:SMTP_PORT = "587"
+$env:SMTP_USERNAME = "votre-identifiant-smtp"
+$secretSmtp = Read-Host "Mot de passe ou clé SMTP" -AsSecureString
+$env:SMTP_PASSWORD = [System.Net.NetworkCredential]::new("", $secretSmtp).Password
+$env:SMTP_FROM = "adresse-expediteur-validee@votre-domaine.com"
+$env:APP_PUBLIC_URL = "http://localhost:4200"
+```
+
+Ces adresses sont des exemples à remplacer. En ligne, `APP_PUBLIC_URL` doit être l'adresse HTTPS réelle du frontend, sans paramètre ni fragment. Par défaut SMTP utilise authentification et STARTTLS (port 587). Pour le port 465, utiliser `SMTP_SSL=true` et `SMTP_STARTTLS=false` selon le fournisseur. Redémarrer le backend après configuration. Aucun fournisseur email réel n'est configuré par cette mise à jour et aucun email utilisateur n'a été envoyé pendant les tests.
+
+Sans SMTP, le formulaire indique que l'envoi est indisponible. Le SUPER_ADMIN peut néanmoins ouvrir **Commerciaux > [compte] > Réinitialiser le mot de passe**, saisir et confirmer le nouveau mot de passe, puis le transmettre personnellement. Cette assistance ne permet pas de réinitialiser un compte administrateur ; pour le mot de passe oublié du SUPER_ADMIN, configurer l'email.
+
+API : POST `/api/auth/forgot-password` avec `{email}`, POST `/api/auth/reset-password` avec `{token,password}`, et POST `/api/commercials/{id}/password` avec `{password}` (SUPER_ADMIN). Ces écritures restent protégées par CSRF.
+
+## Profils à compter dans les bilans AZO
+
+La grille tarifaire fournie distingue les profils suivants : clients ; Speeders moto essence, moto électrique, tricycle, Gazelle, Koala et Léopard ; livreurs express ; coursiers personnels ; agences PRO, SILVER, OR, DIAMANT, PLATINE et ELITE ; boutiques partenaires. Les types de colis, commissions et options de téléphone ne sont pas des inscriptions supplémentaires.
+
+En mode statistiques AZO, cocher **Détailler les profils AZO**, puis renseigner les compteurs par groupe. Les **comptes inscrits (uniques)** restent un indicateur séparé : un même compte pouvant activer plusieurs activités, la somme des profils ne remplace pas le nombre de personnes inscrites. Les nombres correspondent aux profils enregistrés/activés dans la journée, pas au nombre de courses ou livraisons effectuées. Les rapports Zehami gardent leurs compteurs génériques, faute de nomenclature Zehami fournie.
+
+La répartition est conservée dans le rapport et reprise dans la lecture et le PDF. Les anciens rapports restent sans répartition, explicitement indiquée comme non fournie. L'API des profils est GET `/api/report-profiles`. Les créations/modifications acceptent `profileCounts`, objet dont les clés sont les codes renvoyés par cette API et les valeurs des entiers entre 0 et 1 000 000.
+
+Le contrat des API mobiles peut aussi fournir `profileCounts`, par exemple `{"CLIENT":4,"SPEEDER_MOTO_ESSENCE":2,"AGENCE_PRO":1}`. Une répartition absente n'est jamais transformée en chiffres vérifiés à zéro. Avec l'import actif, seule la répartition renvoyée par l'API est enregistrée ; les valeurs du navigateur sont ignorées. La migration V4 ajoute ces compteurs et la réinitialisation sans effacer les données.

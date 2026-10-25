@@ -1,4 +1,5 @@
 import { Component, inject, signal } from "@angular/core";
+import { HttpClient } from "@angular/common/http";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { finalize, switchMap } from "rxjs";
 import { AccountService, Commercial } from "../core/account.service";
@@ -96,6 +97,40 @@ export class CommercialsComponent {
       .subscribe({
         next: () => {
           this.success.set("Compte commercial mis à jour.");
+          this.load();
+        },
+        error: (e) => this.error.set(apiError(e)),
+      });
+  }
+  private http = inject(HttpClient);
+  resetPassword(u: Commercial, password: string, confirmation: string) {
+    if (this.busy()) return;
+    if (
+      password.length < 12 ||
+      password.length > 72 ||
+      password !== confirmation
+    ) {
+      this.error.set(
+        "Choisissez 12 à 72 caractères et confirmez le même mot de passe.",
+      );
+      return;
+    }
+    this.busy.set(true);
+    this.error.set("");
+    this.auth
+      .csrf()
+      .pipe(
+        switchMap(() =>
+          this.http.post<{ message: string }>(
+            `/api/commercials/${u.id}/password`,
+            { password },
+          ),
+        ),
+        finalize(() => this.busy.set(false)),
+      )
+      .subscribe({
+        next: (r) => {
+          this.success.set(r.message);
           this.load();
         },
         error: (e) => this.error.set(apiError(e)),

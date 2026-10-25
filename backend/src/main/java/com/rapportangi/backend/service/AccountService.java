@@ -74,7 +74,7 @@ public class AccountService {
     boolean enabled
   ) {
     var u = users
-      .findById(id)
+      .findLockedById(id)
       .filter(this::commercial)
       .orElseThrow(() ->
         new ResponseStatusException(

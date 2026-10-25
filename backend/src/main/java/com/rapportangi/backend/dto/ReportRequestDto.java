@@ -142,4 +142,16 @@ public class ReportRequestDto {
   public void setVersion(Long value) {
     this.version = value;
   }
+
+  @jakarta.validation.constraints.Size(max = 16)
+  private java.util.Map<String, Integer> profileCounts =
+    new java.util.HashMap<>();
+
+  public java.util.Map<String, Integer> getProfileCounts() {
+    return profileCounts;
+  }
+
+  public void setProfileCounts(java.util.Map<String, Integer> value) {
+    profileCounts = value;
+  }
 }

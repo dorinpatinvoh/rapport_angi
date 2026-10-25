@@ -90,6 +90,7 @@ public class MobileStatsService {
         stats.prospectsContacted() > 1000000 ||
         stats.registrations() > 1000000
       ) throw new IllegalArgumentException();
+      AzoProfiles.validate(stats.profileCounts(), user.getTeam());
       return stats;
     } catch (Exception ex) {
       throw new ResponseStatusException(
@@ -104,6 +105,7 @@ public class MobileStatsService {
     String referralCode,
     LocalDate date,
     Integer prospectsContacted,
-    Integer registrations
+    Integer registrations,
+    Map<String, Integer> profileCounts
   ) {}
 }

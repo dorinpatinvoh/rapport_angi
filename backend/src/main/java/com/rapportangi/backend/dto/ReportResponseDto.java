@@ -187,4 +187,15 @@ public class ReportResponseDto {
     String reviewerName,
     LocalDateTime createdAt
   ) {}
+
+  private java.util.Map<String, Integer> profileCounts =
+    new java.util.HashMap<>();
+
+  public java.util.Map<String, Integer> getProfileCounts() {
+    return profileCounts;
+  }
+
+  public void setProfileCounts(java.util.Map<String, Integer> value) {
+    profileCounts = value;
+  }
 }

@@ -138,7 +138,7 @@
                 </div>
                 <div class="col-sm-6">
                   <label for="registrations" class="form-label"
-                    >Inscriptions attribuées</label
+                    >Comptes inscrits (uniques)</label
                   ><input
                     id="registrations"
                     type="number"
@@ -152,6 +152,56 @@
                   />
                 </div>
               </div>
+            </div>
+          </div>
+        }
+        @if (form.controls.mode.value === "STATS" && isAzo()) {
+          <div class="col-12">
+            <div class="stats-box">
+              <h3 class="h5">Profils AZO enregistrés / activés</h3>
+              <p class="small text-secondary">
+                Un compte peut avoir plusieurs profils. Leur somme peut dépasser
+                le nombre de comptes uniques inscrits. Ne comptez pas les
+                courses ou les livraisons réalisées.
+              </p>
+              <label class="d-flex gap-2 mb-3"
+                ><input
+                  type="checkbox"
+                  class="form-check-input"
+                  formControlName="detailProfiles"
+                  [attr.aria-label]="'Détailler les profils AZO'"
+                />Détailler les profils AZO</label
+              >
+              @if (form.controls.detailProfiles.value) {
+                <div [formGroup]="profileForm">
+                  @for (group of profileGroups(); track group) {
+                    <details class="mb-3" open>
+                      <summary class="fw-semibold">{{ group }}</summary>
+                      <div class="row g-3 mt-1">
+                        @for (p of groupProfiles(group); track p.code) {
+                          <div class="col-sm-6">
+                            <label
+                              [for]="'profile-' + p.code"
+                              class="form-label"
+                              >{{ p.label }}</label
+                            ><input
+                              [id]="'profile-' + p.code"
+                              [formControlName]="p.code"
+                              type="number"
+                              inputmode="numeric"
+                              min="0"
+                              max="1000000"
+                              step="1"
+                              [readonly]="form.controls.syncStats.value"
+                              class="form-control"
+                            />
+                          </div>
+                        }
+                      </div>
+                    </details>
+                  }
+                </div>
+              }
             </div>
           </div>
         }
@@ -263,7 +313,7 @@
           </div>
           <div class="col-6">
             <span class="metric">{{ r.registrations }}</span>
-            <p>Inscriptions attribuées</p>
+            <p>Comptes inscrits (uniques)</p>
           </div>
         </div>
         <p class="small mb-0">
@@ -277,6 +327,30 @@
           }
         </p>
       </div>
+    }
+    @if (r.mode === "STATS" && r.team === "AZO") {
+      <section class="stats-box mb-4">
+        <h3 class="h5">Profils AZO enregistrés / activés</h3>
+        @if (hasProfiles(r)) {
+          <dl class="report-meta">
+            @for (p of profileDefs(); track p.code) {
+              @if (r.profileCounts && r.profileCounts[p.code] !== undefined) {
+                <div>
+                  <dt>{{ p.label }}</dt>
+                  <dd>{{ r.profileCounts[p.code] }}</dd>
+                </div>
+              }
+            }
+          </dl>
+          <p class="small mb-0">
+            Total de profils renseignés : {{ profileTotal(r) }}. Un compte peut
+            avoir plusieurs profils ; ce total n'est pas le nombre de comptes
+            uniques.
+          </p>
+        } @else {
+          <p class="small mb-0">Répartition non fournie.</p>
+        }
+      </section>
     }
     <h3 class="h5">
       {{ r.mode === "STATS" ? "Observations" : "Déroulement de la journée" }}

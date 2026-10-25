@@ -132,7 +132,11 @@ const assert = require("node:assert/strict");
     .getByLabel("Comment souhaitez-vous faire votre bilan ?")
     .selectOption("STATS");
   await seller.getByLabel("Prospects contactés", { exact: true }).fill("12");
-  await seller.getByLabel("Inscriptions attribuées", { exact: true }).fill("3");
+  await seller
+    .getByLabel("Comptes inscrits (uniques)", { exact: true })
+    .fill("3");
+  await seller.getByLabel("Détailler les profils AZO", { exact: true }).check();
+  await seller.getByLabel("Speeder moto à essence", { exact: true }).fill("2");
   await seller
     .getByLabel("Observations (facultatif)")
     .fill("Trois inscriptions attribuées, après vérification.");
@@ -189,6 +193,36 @@ const assert = require("node:assert/strict");
       fullPage: true,
     });
   }
+  await admin.getByRole("link", { name: "Commerciaux", exact: true }).click();
+  const sellerCard = admin.locator("article").filter({ hasText: sellerEmail });
+  await sellerCard
+    .getByText("Réinitialiser le mot de passe", { exact: true })
+    .click();
+  const freshPassword = `updated-${password}`;
+  await sellerCard
+    .getByLabel("Nouveau mot de passe (12 à 72 caractères)", { exact: true })
+    .fill(freshPassword);
+  await sellerCard
+    .getByLabel("Confirmation", { exact: true })
+    .fill(freshPassword);
+  await sellerCard
+    .getByRole("button", { name: "Changer le mot de passe", exact: true })
+    .click();
+  await admin.getByRole("status").filter({ hasText: "réinitialisé" }).waitFor();
+  await seller.goto(root + "/rapports");
+  await seller.waitForURL("**/connexion");
+  await seller
+    .getByRole("link", { name: "Mot de passe oublié ?", exact: true })
+    .click();
+  await seller.getByLabel("Email du compte", { exact: true }).fill(sellerEmail);
+  await seller
+    .getByRole("button", { name: "Recevoir le lien", exact: true })
+    .click();
+  await seller
+    .getByRole("alert")
+    .filter({ hasText: "pas encore configurée" })
+    .waitFor();
+  await login(seller, sellerEmail, freshPassword);
   await seller
     .getByRole("button", { name: "Déconnexion", exact: true })
     .click();
@@ -197,7 +231,7 @@ const assert = require("node:assert/strict");
   await seller.waitForURL("**/connexion");
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: signup, activation, commercial creation, login, written report, return, stats report, resubmission, confirmation, PDF download, logout, 360/390/768/1440px without overflow; no browser errors.",
+    "PASS: signup, activation, commercial creation, login, written report, return, stats report, resubmission, confirmation, AZO profile breakdown, PDF download, admin password reset, stale session invalidation, forgot-password form, logout, 360/390/768/1440px without overflow; no browser errors.",
   );
   await browser.close();
 })().catch((error) => {

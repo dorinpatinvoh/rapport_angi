@@ -205,4 +205,22 @@ public class Report {
   public void setReviews(java.util.List<ReportReview> value) {
     this.reviews = value;
   }
+
+  @ElementCollection
+  @CollectionTable(
+    name = "report_profile_counts",
+    joinColumns = @JoinColumn(name = "report_id")
+  )
+  @MapKeyColumn(name = "profile_code", length = 50)
+  @Column(name = "profile_count", nullable = false)
+  private java.util.Map<String, Integer> profileCounts =
+    new java.util.HashMap<>();
+
+  public java.util.Map<String, Integer> getProfileCounts() {
+    return profileCounts;
+  }
+
+  public void setProfileCounts(java.util.Map<String, Integer> value) {
+    profileCounts = value;
+  }
 }

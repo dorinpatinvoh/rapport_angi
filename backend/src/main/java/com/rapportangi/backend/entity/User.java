@@ -127,4 +127,15 @@ public class User {
   public void setReferralCode(String value) {
     this.referralCode = value;
   }
+
+  @jakarta.persistence.Column(name = "security_version", nullable = false)
+  private long securityVersion;
+
+  public long getSecurityVersion() {
+    return securityVersion;
+  }
+
+  public void setSecurityVersion(long value) {
+    securityVersion = value;
+  }
 }
