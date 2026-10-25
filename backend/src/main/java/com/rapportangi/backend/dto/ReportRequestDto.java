@@ -75,7 +75,6 @@ public class ReportRequestDto {
     this.team = value;
   }
 
-  @PastOrPresent
   private java.time.LocalDate reportDate;
 
   public java.time.LocalDate getReportDate() {

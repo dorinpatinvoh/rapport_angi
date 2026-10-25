@@ -293,6 +293,17 @@ class CommercialReportingTests {
           .with(csrf())
           .contentType("application/json")
           .content(
+            "{\"title\":\"Date future\",\"mode\":\"STATS\",\"reportDate\":\"2099-01-01\"}"
+          )
+      )
+      .andExpect(status().isBadRequest());
+    mvc
+      .perform(
+        post("/api/reports")
+          .with(user("seller@test.com").roles("COMMERCIAL"))
+          .with(csrf())
+          .contentType("application/json")
+          .content(
             "{\"title\":\"Statistiques\",\"mode\":\"STATS\",\"registrations\":2}"
           )
       )

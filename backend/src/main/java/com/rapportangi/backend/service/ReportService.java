@@ -203,6 +203,12 @@ public class ReportService {
         ? LocalDate.now(ZoneId.of("Africa/Lagos"))
         : request.getReportDate()
     );
+    if (r.getReportDate().isAfter(LocalDate.now(ZoneId.of("Africa/Lagos")))) {
+      throw error(
+        HttpStatus.BAD_REQUEST,
+        "La journée du rapport ne peut pas être dans le futur."
+      );
+    }
     String content =
       request.getContent() == null ? "" : request.getContent().strip();
     if (request.getMode().equals("WRITTEN") && content.isBlank()) throw error(
