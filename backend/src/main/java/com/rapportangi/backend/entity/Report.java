@@ -223,4 +223,40 @@ public class Report {
   public void setProfileCounts(java.util.Map<String, Integer> value) {
     profileCounts = value;
   }
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "supervisor_id")
+  private User supervisor;
+
+  @Column(length = 150)
+  private String zone;
+
+  public User getSupervisor() {
+    return supervisor;
+  }
+
+  public void setSupervisor(User value) {
+    supervisor = value;
+  }
+
+  public String getZone() {
+    return zone;
+  }
+
+  public void setZone(String value) {
+    zone = value;
+  }
+
+  @ElementCollection
+  @CollectionTable(
+    name = "report_goal_counts",
+    joinColumns = @JoinColumn(name = "report_id")
+  )
+  @MapKeyColumn(name = "goal_code", length = 50)
+  @Column(name = "goal_count", nullable = false)
+  private java.util.Map<String, Integer> goalCounts = new java.util.HashMap<>();
+
+  public java.util.Map<String, Integer> getGoalCounts() {
+    return goalCounts;
+  }
 }

@@ -4,9 +4,11 @@
     <h1>Rapports commerciaux</h1>
     <p class="text-secondary">Une journée, un bilan clair pour ANGI DSN PRO.</p>
   </div>
-  <button class="btn btn-primary" [disabled]="busy()" (click)="edit()">
-    <i aria-hidden="true" class="bi bi-plus-lg me-2"></i>Rédiger un rapport
-  </button>
+  @if (auth.isCommercial() || auth.isSuperAdmin()) {
+    <button class="btn btn-primary" [disabled]="busy()" (click)="edit()">
+      <i aria-hidden="true" class="bi bi-plus-lg me-2"></i>Rédiger un rapport
+    </button>
+  }
 </div>
 @if (error()) {
   <div class="alert alert-danger" role="alert">{{ error() }}</div>
@@ -30,7 +32,7 @@
     </div>
     @if (editing()?.status === "RETURNED") {
       <div class="alert alert-warning">
-        Le super administrateur attend votre confirmation ou vos corrections.
+        Votre superviseur attend votre confirmation ou vos corrections.
         Consultez les commentaires dans le rapport.
       </div>
     }
@@ -206,6 +208,48 @@
           </div>
         }
         <div class="col-12">
+          <section class="stats-box">
+            <h3 class="h5">Réalisations du jour pour mes objectifs</h3>
+            <p class="small text-secondary">
+              Nouvelles inscriptions de cette journée uniquement. Pour AZO,
+              comptez les speeders indépendants séparément des chauffeurs de
+              flotte. Ces compteurs ne s'ajoutent pas aux profils : ils servent
+              au suivi des objectifs mensuels.
+            </p>
+            @if (
+              form.controls.mode.value === "STATS" &&
+              form.controls.syncStats.value
+            ) {
+              <p class="small">
+                Ces compteurs seront fournis par l'API mobile si elle transmet
+                goalCounts. Une répartition absente reste non fournie.
+              </p>
+            }
+            <div [formGroup]="goalForm" class="row g-3">
+              @for (g of goalDefs(); track g.code) {
+                <div class="col-sm-6">
+                  <label [for]="'goal-' + g.code" class="form-label"
+                    >{{ g.label }} (objectif / mois : {{ g.target }})</label
+                  ><input
+                    [id]="'goal-' + g.code"
+                    [formControlName]="g.code"
+                    class="form-control"
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    max="1000000"
+                    step="1"
+                    [readonly]="
+                      form.controls.mode.value === 'STATS' &&
+                      form.controls.syncStats.value
+                    "
+                  />
+                </div>
+              }
+            </div>
+          </section>
+        </div>
+        <div class="col-12">
           <label for="reportContent" class="form-label">{{
             form.controls.mode.value === "STATS"
               ? "Observations (facultatif)"
@@ -229,7 +273,7 @@
             formControlName="status"
           >
             <option value="DRAFT">Garder en brouillon</option>
-            <option value="SUBMITTED">Soumettre au super administrateur</option>
+            <option value="SUBMITTED">Envoyer au superviseur</option>
           </select>
           <p class="form-text">
             Après soumission, le contenu est verrouillé jusqu'à un éventuel
@@ -352,6 +396,19 @@
         }
       </section>
     }
+    <section class="stats-box mb-4">
+      <h3 class="h5">Réalisations du jour pour les objectifs</h3>
+      <p class="small text-secondary">
+        Zone : {{ r.zone || "Non renseignée" }}. Comptage mensuel après
+        validation.
+      </p>
+      @for (g of goalDefs(r.team); track g.code) {
+        <p>
+          {{ g.label }} :
+          <strong>{{ r.goalCounts[g.code] ?? "Non fourni" }}</strong>
+        </p>
+      }
+    </section>
     <h3 class="h5">
       {{ r.mode === "STATS" ? "Observations" : "Déroulement de la journée" }}
     </h3>
@@ -389,7 +446,17 @@
     </div>
     @if (canReview(r)) {
       <section class="review-box mt-4">
-        <h3 class="h5">Examen du super administrateur</h3>
+        <h3 class="h5">Examen du rapport</h3>
+        <label for="correctionLocation" class="form-label"
+          >Rubrique exacte à corriger (obligatoire pour un retour)</label
+        ><input
+          id="correctionLocation"
+          class="form-control mb-3"
+          maxlength="150"
+          placeholder="Ex. Réalisations du jour → Clients"
+          #location
+          (input)="correctionLocation.set(location.value)"
+        />
         <label for="reviewComment" class="form-label"
           >Commentaire ou informations à confirmer</label
         ><textarea
@@ -432,6 +499,14 @@
     </button>
   </div>
   <div class="panel mb-3">
+    <label for="dailyFilter" class="form-label">Journée (facultatif)</label
+    ><input
+      id="dailyFilter"
+      type="date"
+      class="form-control mb-3"
+      #day
+      (change)="dateFilter.set(day.value)"
+    />
     <div class="row g-3">
       <div class="col-md-6">
         <label for="search" class="form-label">Rechercher</label
@@ -511,7 +586,7 @@
                 Modifier
               </button>
             }
-            @if (r.status === "DRAFT") {
+            @if (r.status === "DRAFT" && canEdit(r)) {
               <button
                 class="btn btn-outline-danger"
                 [disabled]="busy()"

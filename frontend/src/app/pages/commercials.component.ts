@@ -14,7 +14,7 @@ import { apiError } from "../core/report.service";
 export class CommercialsComponent {
   private fb = inject(FormBuilder);
   private accounts = inject(AccountService);
-  private auth = inject(AuthService);
+  readonly auth = inject(AuthService);
   readonly users = signal<Commercial[]>([]);
   readonly busy = signal(false);
   readonly loading = signal(false);

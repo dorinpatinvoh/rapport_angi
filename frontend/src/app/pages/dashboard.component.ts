@@ -8,10 +8,11 @@ import {
   ReportService,
   statusLabel,
 } from "../core/report.service";
+import { ObjectivesComponent } from "./objectives.component";
 @Component({
   selector: "app-dashboard",
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, ObjectivesComponent],
   template: `
     <div class="d-flex flex-wrap justify-content-between gap-3 mb-4">
       <div>
@@ -24,6 +25,7 @@ import {
         >Gérer les rapports</a
       >
     </div>
+    <app-objectives />
     @if (error()) {
       <div class="alert alert-danger" role="alert">
         {{ error() }}

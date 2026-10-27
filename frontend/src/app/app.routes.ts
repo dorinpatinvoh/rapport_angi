@@ -4,8 +4,10 @@ import { ReportsComponent } from "./pages/reports.component";
 import { LoginComponent } from "./pages/login.component";
 import { CommercialsComponent } from "./pages/commercials.component";
 import { RegisterComponent } from "./pages/register.component";
-import { authGuard, superAdminGuard } from "./core/auth.guard";
+import { authGuard, directorGuard, managementGuard } from "./core/auth.guard";
 import { PasswordResetComponent } from "./pages/password-reset.component";
+import { OrganizationComponent } from "./pages/organization.component";
+import { SummariesComponent } from "./pages/summaries.component";
 export const routes: Routes = [
   { path: "", redirectTo: "dashboard", pathMatch: "full" },
   {
@@ -14,11 +16,21 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   { path: "rapports", component: ReportsComponent, canActivate: [authGuard] },
+  {
+    path: "organisation",
+    component: OrganizationComponent,
+    canActivate: [managementGuard],
+  },
+  {
+    path: "syntheses",
+    component: SummariesComponent,
+    canActivate: [managementGuard],
+  },
   { path: "inscription", component: RegisterComponent },
   {
     path: "commerciaux",
     component: CommercialsComponent,
-    canActivate: [superAdminGuard],
+    canActivate: [directorGuard],
   },
   { path: "mot-de-passe-oublie", component: PasswordResetComponent },
   { path: "reinitialiser-mot-de-passe", component: PasswordResetComponent },

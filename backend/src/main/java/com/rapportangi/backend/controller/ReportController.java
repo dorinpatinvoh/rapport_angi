@@ -63,10 +63,29 @@ public class ReportController {
     @Valid @RequestBody ReviewRequest request,
     Authentication auth
   ) {
+    if (
+      "RETURNED".equals(request.action()) &&
+      (request.location() == null || request.location().isBlank())
+    ) throw new org.springframework.web.server.ResponseStatusException(
+      org.springframework.http.HttpStatus.BAD_REQUEST,
+      "Indiquez la rubrique exacte à corriger."
+    );
+    if (
+      "RETURNED".equals(request.action()) &&
+      (request.comment() == null || request.comment().isBlank())
+    ) throw new org.springframework.web.server.ResponseStatusException(
+      org.springframework.http.HttpStatus.BAD_REQUEST,
+      "Décrivez précisément la correction attendue."
+    );
     return reports.review(
       id,
       request.action(),
-      request.comment(),
+      request.location() == null || request.location().isBlank()
+        ? request.comment()
+        : "Rubrique : " +
+            request.location().strip() +
+            "\n" +
+            (request.comment() == null ? "" : request.comment()),
       request.version(),
       auth
     );
@@ -77,7 +96,8 @@ public class ReportController {
     @jakarta.validation.constraints.Pattern(regexp = "RETURNED|CONFIRMED")
     String action,
     @jakarta.validation.constraints.Size(max = 3000) String comment,
-    @jakarta.validation.constraints.NotNull Long version
+    @jakarta.validation.constraints.NotNull Long version,
+    @jakarta.validation.constraints.Size(max = 150) String location
   ) {}
 
   @org.springframework.beans.factory.annotation.Autowired

@@ -91,6 +91,7 @@ public class MobileStatsService {
         stats.registrations() > 1000000
       ) throw new IllegalArgumentException();
       AzoProfiles.validate(stats.profileCounts(), user.getTeam());
+      SalesGoals.validate(stats.goalCounts(), user.getTeam());
       return stats;
     } catch (Exception ex) {
       throw new ResponseStatusException(
@@ -106,6 +107,26 @@ public class MobileStatsService {
     LocalDate date,
     Integer prospectsContacted,
     Integer registrations,
-    Map<String, Integer> profileCounts
-  ) {}
+    Map<String, Integer> profileCounts,
+    Map<String, Integer> goalCounts
+  ) {
+    public Stats(
+      String team,
+      String referralCode,
+      LocalDate date,
+      Integer prospectsContacted,
+      Integer registrations,
+      Map<String, Integer> profileCounts
+    ) {
+      this(
+        team,
+        referralCode,
+        date,
+        prospectsContacted,
+        registrations,
+        profileCounts,
+        null
+      );
+    }
+  }
 }

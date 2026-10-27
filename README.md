@@ -217,3 +217,52 @@ Remove-Item Env:BOOTSTRAP_ADMIN_RESET_PASSWORD -ErrorAction SilentlyContinue
 ```
 
 Le nouveau mot de passe est haché avec BCrypt. Les anciennes sessions et les anciens liens de réinitialisation deviennent invalides. L'option est désactivée par défaut et aucun endpoint public ne permet cette récupération locale.
+
+## Direction commerciale, superviseurs et objectifs mensuels
+
+La migration **V5** ajoute la hiérarchie, les zones, les réalisations et les synthèses sans effacer les comptes ni les rapports existants. Elle s'applique au démarrage du backend. Les anciens comptes SUPER_ADMIN restent inchangés.
+
+### Première configuration depuis l'interface
+
+1. Se connecter avec le SUPER_ADMIN existant. Dans **Commerciaux**, créer et activer le compte destiné au directeur (la création initiale lui donne le rôle commercial).
+2. Dans **Organisation et zones**, sélectionner ce compte, choisir **Directeur commercial**, puis enregistrer. Seul le SUPER_ADMIN peut nommer un directeur. Le compte concerné doit se reconnecter après tout changement d'affectation ou de fonction.
+3. Le directeur se connecte, crée / active les comptes nécessaires dans **Commerciaux**, puis nomme les **Superviseurs** dans **Organisation et zones** en renseignant leur équipe (AZO / Zehami) et leur zone.
+4. Le directeur affecte chaque **Commercial** à un superviseur actif de la même équipe. Sans affectation, les brouillons restent possibles, mais l'envoi est bloqué.
+
+Le superviseur consulte uniquement ses commerciaux et les rapports qui lui ont été envoyés. Le directeur consulte les rapports envoyés de toutes les équipes et leurs statistiques journalières, sans pouvoir modifier, supprimer ou examiner leur contenu. Les brouillons restent visibles uniquement par leur auteur et les administrateurs techniques. Le SUPER_ADMIN conserve la gestion technique et peut examiner les anciens rapports sans superviseur ; les rapports affectés sont examinés par leur superviseur uniquement.
+
+### Objectifs par commercial et par mois
+
+| Équipe | Catégorie | Objectif mensuel |
+| --- | --- | ---: |
+| AZO | Agences de flotte | 10 |
+| AZO | Speeders indépendants | 45 |
+| AZO | Clients | 200 |
+| Zehami | Professionnels | 25 |
+| Zehami | Utilisateurs | 200 |
+
+Le tableau de bord propose le choix du mois, le réalisé validé, le pourcentage et le reste à atteindre pour chaque catégorie. Le mois repose sur la **journée du rapport** (fuseau métier Africa/Lagos), jamais sur sa date de création. Seuls les rapports **CONFIRMED** alimentent le réalisé ; les rapports soumis ou renvoyés sont signalés en attente. Un dépassement reste visible dans le réalisé, avec un reste à zéro et une barre plafonnée à 100 %.
+
+Dans chaque rapport écrit ou statistique, renseigner **Réalisations du jour pour mes objectifs** : uniquement les nouvelles inscriptions de la journée. Ces catégories sont distinctes des profils AZO déjà disponibles : ne pas additionner les profils pour en déduire les speeders indépendants (les chauffeurs de flotte ne sont pas des indépendants). Les anciens rapports sans répartition ne sont pas inventés à zéro ; ils sont signalés comme incomplets dans le bilan. Le bilan d'un compte porte sur son équipe actuellement affectée. Les rapports des anciennes équipes restent consultables dans l'historique.
+
+Un seul rapport envoyé par commercial, équipe et journée est autorisé afin d'éviter un double comptage ; réutiliser le rapport existant pour les corrections. Plusieurs brouillons restent possibles.
+
+### Circuit des rapports
+
+- Le commercial enregistre un brouillon puis **Envoie au superviseur**. Le superviseur et sa zone sont conservés avec le rapport ; une réaffectation ultérieure du commercial ne déplace pas les rapports déjà envoyés.
+- Le superviseur peut **Renvoyer pour confirmation** : la rubrique exacte à corriger et la description de la correction sont obligatoires. Ces éléments figurent dans l'historique, dans la lecture et dans le PDF. Seul l'auteur corrige et soumet de nouveau.
+- Le superviseur confirme les rapports, puis ouvre **Synthèses et rapport général**, choisit la journée et rédige son résumé. Tous les rapports déjà envoyés de cette journée / équipe doivent être confirmés ; au moins un est nécessaire.
+- L'envoi de la synthèse est définitif pour cette journée et cette équipe. Les identifiants des rapports sources sont conservés, leurs compteurs restent verrouillés et les envois tardifs sont bloqués avec une explication. Vérifier les commerciaux sans rapport avant de clôturer. Une seule synthèse par superviseur, équipe et journée.
+- Le directeur reçoit les synthèses dans **Rapport général**, avec un total distinct pour AZO et Zehami, la liste des superviseurs n'ayant pas transmis de synthèse, et les statistiques journalières par commercial. Chaque rapport source reste accessible en lecture et en PDF. La réception se fait dans l'application, sans email automatique.
+
+Les changements de fonction d'un commercial avec des rapports en cours sont bloqués. Changer la fonction, l'équipe ou la zone d'un superviseur exige de réaffecter ses commerciaux si nécessaire et de transmettre les synthèses de ses rapports précédents.
+
+### API
+
+- GET `/api/sales/members`, PUT `/api/sales/members/{id}` : `{role,team,supervisorId,zone}`. Rôles `DIRECTEUR_COMMERCIAL`, `SUPERVISEUR`, `COMMERCIAL` ; la nomination d'un directeur reste réservée au SUPER_ADMIN. CSRF requis.
+- GET `/api/sales/goals?team=AZO`, GET `/api/sales/objectives?month=2026-10` : définitions et bilan dans le périmètre du compte connecté.
+- GET `/api/sales/summaries?date=2026-10-27`, POST `/api/sales/summaries` : `{date,content}`. Création réservée au superviseur, lecture par son auteur ou la direction.
+- POST `/api/reports/{id}/review` : `{action,comment,location,version}` ; `location` et `comment` obligatoires pour `RETURNED`.
+- Les rapports acceptent `goalCounts` (entiers 0..1 000 000), codes AZO `AGENCES_FLOTTE`, `SPEEDERS_INDEPENDANTS`, `CLIENTS` ; codes Zehami `PROFESSIONNELS`, `UTILISATEURS`.
+
+L'API mobile peut aussi renvoyer ce champ optionnel, par exemple `"goalCounts":{"AGENCES_FLOTTE":2,"SPEEDERS_INDEPENDANTS":4,"CLIENTS":12}`. Lors d'un import, les valeurs du navigateur sont ignorées et seules les réalisations renvoyées par l'API sont conservées. Si ce champ manque, la répartition reste non fournie. Aucune connexion réelle à AZO ou Zehami n'est activée par cette mise à jour.

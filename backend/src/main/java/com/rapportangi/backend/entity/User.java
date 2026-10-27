@@ -103,7 +103,7 @@ public class User {
   }
 
   public void setRoles(Set<Role> roles) {
-    this.roles = roles;
+    this.roles = new HashSet<>(roles);
   }
 
   @Column(length = 20)
@@ -137,5 +137,28 @@ public class User {
 
   public void setSecurityVersion(long value) {
     securityVersion = value;
+  }
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "supervisor_id")
+  private User supervisor;
+
+  @Column(length = 150)
+  private String zone;
+
+  public User getSupervisor() {
+    return supervisor;
+  }
+
+  public void setSupervisor(User value) {
+    supervisor = value;
+  }
+
+  public String getZone() {
+    return zone;
+  }
+
+  public void setZone(String value) {
+    zone = value;
   }
 }

@@ -120,21 +120,7 @@ public class PasswordResetService {
   public void resetCommercial(Long id, String password) {
     var user = users
       .findLockedById(id)
-      .filter(
-        u ->
-          u
-            .getRoles()
-            .stream()
-            .anyMatch(
-              r ->
-                r.getName().contains("COMMERCIAL") ||
-                r.getName().equals("ROLE_USER")
-            ) &&
-          u
-            .getRoles()
-            .stream()
-            .noneMatch(r -> r.getName().contains("ADMIN"))
-      )
+      .filter(SalesAccess::commercial)
       .orElseThrow(() ->
         new ResponseStatusException(
           HttpStatus.NOT_FOUND,

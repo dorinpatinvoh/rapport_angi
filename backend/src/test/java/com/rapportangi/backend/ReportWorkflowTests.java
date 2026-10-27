@@ -46,7 +46,13 @@ class ReportWorkflowTests {
       .apply(springSecurity())
       .build();
     reports.deleteAll();
+    users.findAll().forEach(u -> {
+      u.setSupervisor(null);
+      users.save(u);
+    });
+    users.flush();
     users.deleteAll();
+    account("supervisor@angi.test", "SUPERVISEUR", true);
     authorId = account("commercial@angi.test", "COMMERCIAL", true);
     account("other@angi.test", "COMMERCIAL", true);
     account("admin@angi.test", "ADMIN", true);
@@ -62,6 +68,10 @@ class ReportWorkflowTests {
     u.setPassword(passwords.encode("strong-test-password"));
     u.setEnabled(enabled);
     u.setRoles(Set.of(roles.findByName(role).orElseThrow()));
+    if (role.equals("SUPERVISEUR")) u.setZone("Zone test");
+    if (role.equals("COMMERCIAL")) u.setSupervisor(
+      users.findByEmail("supervisor@angi.test").orElseThrow()
+    );
     return users.save(u).getId();
   }
 
@@ -237,7 +247,7 @@ class ReportWorkflowTests {
           .with(user("admin@angi.test").roles("ADMIN"))
           .with(csrf())
       )
-      .andExpect(status().isNoContent());
+      .andExpect(status().isForbidden());
   }
 
   @Test

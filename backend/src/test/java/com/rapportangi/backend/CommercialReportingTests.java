@@ -45,7 +45,13 @@ class CommercialReportingTests {
       .apply(springSecurity())
       .build();
     reports.deleteAll();
+    users.findAll().forEach(u -> {
+      u.setSupervisor(null);
+      users.save(u);
+    });
+    users.flush();
     users.deleteAll();
+    account("supervisor@test.com", "SUPERVISEUR", "AZO");
     account("seller@test.com", "COMMERCIAL", "AZO");
     account("super@test.com", "SUPER_ADMIN", null);
     account("admin@test.com", "ADMIN", null);
@@ -59,8 +65,14 @@ class CommercialReportingTests {
     u.setEmail(email);
     u.setPassword(passwords.encode("strong-test-password"));
     u.setTeam(team);
-    u.setReferralCode(team == null ? null : "CODE-" + team);
+    u.setReferralCode(
+      team == null || role.equals("SUPERVISEUR") ? null : "CODE-" + team
+    );
     u.setRoles(Set.of(roles.findByName(role).orElseThrow()));
+    if (role.equals("SUPERVISEUR")) u.setZone("Zone test");
+    if (email.equals("seller@test.com")) u.setSupervisor(
+      users.findByEmail("supervisor@test.com").orElseThrow()
+    );
     users.save(u);
   }
 
@@ -108,7 +120,7 @@ class CommercialReportingTests {
     mvc
       .perform(
         post("/api/reports/" + id + "/review")
-          .with(user("super@test.com").roles("SUPER_ADMIN"))
+          .with(user("supervisor@test.com").roles("SUPERVISEUR"))
           .with(csrf())
           .contentType("application/json")
           .content(
@@ -116,7 +128,7 @@ class CommercialReportingTests {
               action +
               "\",\"comment\":\"" +
               comment +
-              "\",\"version\":" +
+              "\",\"location\":\"Inscriptions\",\"version\":" +
               version(id) +
               "}"
           )
@@ -355,7 +367,9 @@ class CommercialReportingTests {
       mvc
         .perform(
           get("/api/reports/" + id + "/pdf").with(
-            user("admin@test.com").roles("COMMERCIAL")
+            user(
+              email.startsWith("seller") ? "zehami@test.com" : "seller@test.com"
+            ).roles("COMMERCIAL")
           )
         )
         .andExpect(status().isNotFound());

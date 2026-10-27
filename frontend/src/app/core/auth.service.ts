@@ -16,6 +16,20 @@ export class AuthService {
   readonly isSuperAdmin = computed(
     () => this.user()?.roles.includes("ROLE_SUPER_ADMIN") ?? false,
   );
+  readonly isDirector = computed(
+    () =>
+      this.isSuperAdmin() ||
+      (this.user()?.roles.includes("ROLE_DIRECTEUR_COMMERCIAL") ?? false),
+  );
+  readonly isSupervisor = computed(
+    () => this.user()?.roles.includes("ROLE_SUPERVISEUR") ?? false,
+  );
+  readonly isManagement = computed(
+    () => this.isDirector() || this.isSupervisor(),
+  );
+  readonly isCommercial = computed(
+    () => !!this.user() && !this.isManagement() && !this.isAdmin(),
+  );
   readonly isAdmin = computed(
     () =>
       this.user()?.roles.some(

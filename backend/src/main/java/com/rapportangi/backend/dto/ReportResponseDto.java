@@ -198,4 +198,34 @@ public class ReportResponseDto {
   public void setProfileCounts(java.util.Map<String, Integer> value) {
     profileCounts = value;
   }
+
+  @jakarta.validation.constraints.Size(max = 5)
+  private java.util.Map<String, Integer> goalCounts = new java.util.HashMap<>();
+
+  public java.util.Map<String, Integer> getGoalCounts() {
+    return goalCounts;
+  }
+
+  public void setGoalCounts(java.util.Map<String, Integer> value) {
+    goalCounts = value;
+  }
+
+  private Long supervisorId;
+  private String zone;
+
+  public Long getSupervisorId() {
+    return supervisorId;
+  }
+
+  public void setSupervisorId(Long value) {
+    supervisorId = value;
+  }
+
+  public String getZone() {
+    return zone;
+  }
+
+  public void setZone(String value) {
+    zone = value;
+  }
 }

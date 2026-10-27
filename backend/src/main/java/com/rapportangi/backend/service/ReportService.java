@@ -18,27 +18,28 @@ public class ReportService {
   private final ReportRepository reports;
   private final UserRepository users;
   private final MobileStatsService mobile;
+  private final SupervisorSummaryRepository summaries;
 
   public ReportService(
     ReportRepository reports,
     UserRepository users,
-    MobileStatsService mobile
+    MobileStatsService mobile,
+    SupervisorSummaryRepository summaries
   ) {
     this.reports = reports;
     this.users = users;
     this.mobile = mobile;
+    this.summaries = summaries;
   }
 
   public List<ReportResponseDto> getAllReports(Authentication auth) {
     var user = currentUser(auth);
-    return (
-      isAdmin(auth)
-        ? reports.findAll(
-            org.springframework.data.domain.Sort.by("createdAt").descending()
-          )
-        : reports.findByAuthorIdOrderByCreatedAtDesc(user.getId())
-    )
+    return reports
+      .findAll(
+        org.springframework.data.domain.Sort.by("createdAt").descending()
+      )
       .stream()
+      .filter(r -> SalesAccess.reads(user, r))
       .map(this::map)
       .toList();
   }
@@ -53,6 +54,14 @@ public class ReportService {
     Authentication auth
   ) {
     var user = currentUser(auth);
+    if (
+      !SalesAccess.commercial(user) &&
+      !SalesAccess.has(user, "SUPER_ADMIN") &&
+      !SalesAccess.has(user, "ADMIN")
+    ) throw error(
+      HttpStatus.FORBIDDEN,
+      "Seuls les commerciaux rédigent les rapports terrain."
+    );
     var report = new Report();
     report.setAuthor(user);
     String team =
@@ -78,13 +87,17 @@ public class ReportService {
   ) {
     var report = accessible(id, auth);
     var user = currentUser(auth);
-    if (!report.getAuthor().getId().equals(user.getId())) throw error(
+    if (
+      SalesAccess.has(user, "DIRECTEUR_COMMERCIAL") ||
+      SalesAccess.has(user, "SUPERVISEUR") ||
+      !report.getAuthor().getId().equals(user.getId())
+    ) throw error(
       HttpStatus.FORBIDDEN,
       "Seul l'auteur peut modifier le contenu."
     );
     if (!List.of("DRAFT", "RETURNED").contains(report.getStatus())) throw error(
       HttpStatus.CONFLICT,
-      "Ce rapport est verrouillé. Attendez un retour du super administrateur."
+      "Ce rapport est verrouillé. Attendez un retour de votre superviseur."
     );
     checkVersion(report, request.getVersion());
     if (report.getTeam() == null) {
@@ -107,19 +120,27 @@ public class ReportService {
     Long version,
     Authentication auth
   ) {
-    if (
-      auth
-        .getAuthorities()
-        .stream()
-        .noneMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"))
-    ) throw error(HttpStatus.FORBIDDEN, "Réservé au super administrateur.");
+    var reviewer = currentUser(auth);
     var report = accessible(id, auth);
+    boolean assigned =
+      SalesAccess.has(reviewer, "SUPERVISEUR") &&
+      report.getSupervisor() != null &&
+      report.getSupervisor().getId().equals(reviewer.getId());
+    boolean legacy =
+      SalesAccess.has(reviewer, "SUPER_ADMIN") &&
+      report.getSupervisor() == null;
+    if (!assigned && !legacy) throw error(
+      HttpStatus.FORBIDDEN,
+      "Examen réservé au superviseur affecté à ce rapport."
+    );
+    if (report.getSupervisor() != null) users
+      .findLockedById(report.getSupervisor().getId())
+      .orElseThrow();
     checkVersion(report, version);
     if (!report.getStatus().equals("SUBMITTED")) throw error(
       HttpStatus.CONFLICT,
       "Seul un rapport soumis peut être examiné."
     );
-    var reviewer = currentUser(auth);
     if (report.getAuthor().getId().equals(reviewer.getId())) throw error(
       HttpStatus.FORBIDDEN,
       "Vous ne pouvez pas examiner votre propre rapport."
@@ -156,6 +177,15 @@ public class ReportService {
       HttpStatus.CONFLICT,
       "Seuls les brouillons peuvent être supprimés."
     );
+    var user = currentUser(auth);
+    if (
+      !report.getAuthor().getId().equals(user.getId()) ||
+      SalesAccess.has(user, "DIRECTEUR_COMMERCIAL") ||
+      SalesAccess.has(user, "SUPERVISEUR")
+    ) throw error(
+      HttpStatus.FORBIDDEN,
+      "Seul l'auteur peut supprimer son brouillon."
+    );
     reports.delete(report);
   }
 
@@ -189,13 +219,16 @@ public class ReportService {
     var report = reports
       .findById(id)
       .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Rapport introuvable"));
-    if (
-      !isAdmin(auth) && !report.getAuthor().getId().equals(user.getId())
-    ) throw error(HttpStatus.NOT_FOUND, "Rapport introuvable");
+    if (!SalesAccess.reads(user, report)) throw error(
+      HttpStatus.NOT_FOUND,
+      "Rapport introuvable"
+    );
     return report;
   }
 
   private void apply(Report r, ReportRequestDto request, User user) {
+    // Lock the author so parallel submissions cannot duplicate the same daily counters.
+    users.findLockedById(user.getId()).orElseThrow();
     r.setTitle(request.getTitle().strip());
     r.setMode(request.getMode());
     r.setReportDate(
@@ -217,6 +250,56 @@ public class ReportService {
     );
     r.setContent(content);
     r.setStatus(request.getStatus() == null ? "DRAFT" : request.getStatus());
+    if ("SUBMITTED".equals(r.getStatus())) {
+      var supervisor = user.getSupervisor();
+      if (
+        SalesAccess.commercial(user) &&
+        (supervisor == null ||
+          !supervisor.isEnabled() ||
+          !SalesAccess.has(supervisor, "SUPERVISEUR") ||
+          !java.util.Objects.equals(supervisor.getTeam(), r.getTeam()) ||
+          supervisor.getZone() == null ||
+          supervisor.getZone().isBlank())
+      ) throw error(
+        HttpStatus.CONFLICT,
+        "Le directeur doit vous affecter à un superviseur actif, une équipe et une zone avant l'envoi."
+      );
+      if (supervisor != null) {
+        users.findLockedById(supervisor.getId()).orElseThrow();
+        if (
+          summaries.existsBySupervisorIdAndReportDateAndTeam(
+            supervisor.getId(),
+            r.getReportDate(),
+            r.getTeam()
+          )
+        ) throw error(
+          HttpStatus.CONFLICT,
+          "La synthèse de cette journée a déjà été transmise. Contactez votre superviseur."
+        );
+      }
+      r.setSupervisor(supervisor);
+      r.setZone(supervisor == null ? null : supervisor.getZone());
+      boolean duplicate = reports
+        .findByAuthorIdOrderByCreatedAtDesc(user.getId())
+        .stream()
+        .anyMatch(
+          other ->
+            !java.util.Objects.equals(other.getId(), r.getId()) &&
+            other.getReportDate().equals(r.getReportDate()) &&
+            java.util.Objects.equals(other.getTeam(), r.getTeam()) &&
+            !"DRAFT".equals(other.getStatus())
+        );
+      if (duplicate) throw error(
+        HttpStatus.CONFLICT,
+        "Un rapport existe déjà pour cette journée et cette équipe. Corrigez le rapport existant pour éviter un double comptage."
+      );
+    }
+    r.getGoalCounts().clear();
+    if (
+      !request.getSyncStats() || !"STATS".equals(request.getMode())
+    ) r.getGoalCounts().putAll(
+      SalesGoals.validate(request.getGoalCounts(), r.getTeam())
+    );
     r.setProspectsContacted(0);
     r.setRegistrations(0);
     r.setStatsSource("DECLARED");
@@ -232,6 +315,9 @@ public class ReportService {
         var stats = mobile.fetch(user, r.getReportDate());
         r.getProfileCounts().putAll(
           AzoProfiles.validate(stats.profileCounts(), r.getTeam())
+        );
+        r.getGoalCounts().putAll(
+          SalesGoals.validate(stats.goalCounts(), r.getTeam())
         );
         r.setProspectsContacted(stats.prospectsContacted());
         r.setRegistrations(stats.registrations());
@@ -252,6 +338,11 @@ public class ReportService {
   private ReportResponseDto map(Report r) {
     var d = new ReportResponseDto();
     d.setId(r.getId());
+    d.setGoalCounts(new java.util.TreeMap<>(r.getGoalCounts()));
+    d.setSupervisorId(
+      r.getSupervisor() == null ? null : r.getSupervisor().getId()
+    );
+    d.setZone(r.getZone());
     d.setTitle(r.getTitle());
     d.setContent(r.getContent());
     d.setStatus(r.getStatus());

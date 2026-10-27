@@ -39,6 +39,11 @@ public class ReportPdfService {
         11,
         Color.BLACK
       );
+      if (report.getZone() != null) layout.text(
+        "Zone : " + report.getZone(),
+        11,
+        Color.BLACK
+      );
       layout.text("Statut : " + status(report.getStatus()), 11, Color.BLACK);
       layout.text(
         "Code de parrainage : " +
@@ -109,6 +114,25 @@ public class ReportPdfService {
         }
         layout.text(
           "Un compte peut activer plusieurs profils : leur somme n'est pas le nombre de comptes uniques.",
+          9,
+          Color.DARK_GRAY
+        );
+        layout.space(16);
+      }
+      if (!report.getGoalCounts().isEmpty()) {
+        layout.text(
+          "RÉALISATIONS DU JOUR POUR LES OBJECTIFS",
+          12,
+          new Color(89, 22, 129)
+        );
+        for (var goal : SalesGoals.definitions(report.getTeam()))
+          if (report.getGoalCounts().containsKey(goal.code())) layout.text(
+            goal.label() + " : " + report.getGoalCounts().get(goal.code()),
+            11,
+            Color.BLACK
+          );
+        layout.text(
+          "Comptées dans le bilan mensuel après validation du superviseur.",
           9,
           Color.DARK_GRAY
         );

@@ -1,4 +1,6 @@
 import { Component, computed, inject, signal } from "@angular/core";
+import { ActivatedRoute } from "@angular/router";
+import { Goal, SalesService, goalLabels } from "../core/sales.service";
 import { DatePipe } from "@angular/common";
 import { HttpClient } from "@angular/common/http";
 import {
@@ -25,6 +27,23 @@ import {
 })
 export class ReportsComponent {
   private api = inject(ReportService);
+  private sales = inject(SalesService);
+  private route = inject(ActivatedRoute);
+  readonly goalLabels = goalLabels;
+  readonly goals = signal<Record<string, Goal[]>>({});
+  readonly goalForm = new FormGroup<Record<string, FormControl<number>>>({});
+  readonly dateFilter = signal("");
+  readonly correctionLocation = signal("");
+  goalDefs(team?: string | null) {
+    return (
+      this.goals()[
+        team ??
+          this.editing()?.team ??
+          this.auth.user()?.team ??
+          this.form.controls.team.value
+      ] || []
+    );
+  }
   readonly auth = inject(AuthService);
   private fb = inject(FormBuilder);
   private http = inject(HttpClient);
@@ -51,6 +70,7 @@ export class ReportsComponent {
   readonly filtered = computed(() =>
     this.reports().filter(
       (r) =>
+        (!this.dateFilter() || r.reportDate === this.dateFilter()) &&
         (!this.statusFilter() || r.status === this.statusFilter()) &&
         (!this.teamFilter() || r.team === this.teamFilter()) &&
         `${r.title} ${r.content} ${r.authorName}`
@@ -115,6 +135,28 @@ export class ReportsComponent {
     return Object.values(r.profileCounts || {}).reduce((a, b) => a + b, 0);
   }
   constructor() {
+    for (const team of ["AZO", "ZEHAMI"])
+      this.sales.goals(team).subscribe({
+        next: (defs) => {
+          this.goals.update((g) => ({ ...g, [team]: defs }));
+          for (const d of defs)
+            this.goalForm.addControl(
+              d.code,
+              new FormControl(0, {
+                nonNullable: true,
+                validators: [
+                  Validators.required,
+                  Validators.min(0),
+                  Validators.max(1000000),
+                  Validators.pattern(/^\d+$/),
+                ],
+              }),
+            );
+          if (this.editing()?.goalCounts)
+            this.goalForm.patchValue(this.editing()!.goalCounts);
+        },
+        error: (e) => this.error.set(apiError(e)),
+      });
     this.http.get<AzoProfile[]>("/api/report-profiles").subscribe({
       next: (defs) => {
         this.profileDefs.set(defs);
@@ -158,6 +200,11 @@ export class ReportsComponent {
       .subscribe({
         next: (r) => {
           this.reports.set(r);
+          const requested = this.route.snapshot.queryParamMap.get("id");
+          if (requested && !this.detail())
+            this.detail.set(
+              r.find((item) => item.id === Number(requested)) ?? null,
+            );
           const opened = this.detail();
           if (opened)
             this.detail.set(r.find((item) => item.id === opened.id) ?? null);
@@ -173,18 +220,22 @@ export class ReportsComponent {
   }
   canReview(r: Report) {
     return (
-      this.auth.isSuperAdmin() &&
+      ((this.auth.isSupervisor() && r.supervisorId === this.auth.user()?.id) ||
+        (this.auth.isSuperAdmin() && !r.supervisorId)) &&
       r.status === "SUBMITTED" &&
       r.authorId !== this.auth.user()?.id
     );
   }
   read(r: Report) {
+    this.correctionLocation.set("");
     this.detail.set(r);
     this.formVisible.set(false);
     this.error.set("");
     this.jump("report-detail");
   }
   edit(r?: Report) {
+    this.goalForm.reset();
+    if (r?.goalCounts) this.goalForm.patchValue(r.goalCounts);
     this.editing.set(r ?? null);
     this.form.reset({
       title: r?.title ?? "",
@@ -209,14 +260,27 @@ export class ReportsComponent {
   save() {
     if (
       this.form.invalid ||
+      this.goalForm.invalid ||
       this.busy() ||
       (this.isAzo() &&
         this.form.controls.detailProfiles.value &&
         this.profileForm.invalid)
     )
       return;
+    if (!this.goalDefs().length) {
+      this.error.set(
+        "Impossible de charger les objectifs. Actualisez avant de sauvegarder le rapport.",
+      );
+      return;
+    }
     const data = {
       ...this.form.getRawValue(),
+      goalCounts: Object.fromEntries(
+        this.goalDefs().map((g) => [
+          g.code,
+          this.goalForm.controls[g.code]?.value ?? 0,
+        ]),
+      ),
       profileCounts:
         this.isAzo() &&
         this.form.controls.mode.value === "STATS" &&
@@ -247,7 +311,7 @@ export class ReportsComponent {
           this.detail.set(report);
           this.success.set(
             report.status === "SUBMITTED"
-              ? "Rapport soumis au super administrateur."
+              ? "Rapport soumis au superviseur."
               : "Brouillon enregistré.",
           );
           this.load();
@@ -265,12 +329,15 @@ export class ReportsComponent {
         prospectsContacted: number;
         registrations: number;
         profileCounts?: Record<string, number>;
+        goalCounts?: Record<string, number>;
       }>("/api/integrations/my-stats", {
         params: { date: this.form.controls.reportDate.value },
       })
       .pipe(finalize(() => this.busy.set(false)))
       .subscribe({
         next: (r) => {
+          this.goalForm.reset();
+          if (r.goalCounts) this.goalForm.patchValue(r.goalCounts);
           this.profileForm.reset();
           if (r.profileCounts) this.profileForm.patchValue(r.profileCounts);
           this.form.patchValue({
@@ -288,8 +355,11 @@ export class ReportsComponent {
   }
   review(r: Report, action: string, comment: string) {
     if (this.busy()) return;
-    if (action === "RETURNED" && !comment.trim()) {
-      this.error.set("Précisez les informations à confirmer ou corriger.");
+    if (
+      action === "RETURNED" &&
+      (!comment.trim() || !this.correctionLocation().trim())
+    ) {
+      this.error.set("Indiquez la rubrique exacte et la correction attendue.");
       return;
     }
     this.busy.set(true);
@@ -298,11 +368,14 @@ export class ReportsComponent {
     this.auth
       .csrf()
       .pipe(
-        switchMap(() => this.api.review(r, action, comment)),
+        switchMap(() =>
+          this.api.review(r, action, comment, this.correctionLocation()),
+        ),
         finalize(() => this.busy.set(false)),
       )
       .subscribe({
         next: (value) => {
+          this.correctionLocation.set("");
           this.detail.set(value);
           this.success.set(
             action === "RETURNED"

@@ -82,6 +82,13 @@ public class AccountService {
           "Commercial introuvable"
         )
       );
+    if (
+      u.getSupervisor() != null &&
+      !java.util.Objects.equals(team, u.getSupervisor().getTeam())
+    ) throw new ResponseStatusException(
+      HttpStatus.CONFLICT,
+      "Réaffectez ce commercial à un superviseur de la nouvelle équipe depuis Organisation."
+    );
     u.setTeam(team);
     u.setReferralCode(clean(referralCode));
     u.setEnabled(enabled);
@@ -89,6 +96,7 @@ public class AccountService {
   }
 
   private boolean commercial(User u) {
+    if (!SalesAccess.commercial(u)) return false;
     return (
       u
         .getRoles()

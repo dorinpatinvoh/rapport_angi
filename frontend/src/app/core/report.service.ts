@@ -12,6 +12,9 @@ export interface AzoProfile {
   group: string;
 }
 export interface Report {
+  goalCounts: Partial<Record<string, number>>;
+  supervisorId: number | null;
+  zone: string | null;
   profileCounts: Record<string, number>;
   id: number;
   title: string;
@@ -33,6 +36,7 @@ export interface Report {
   reviews: Review[];
 }
 export interface ReportInput {
+  goalCounts: Record<string, number>;
   profileCounts: Record<string, number>;
   title: string;
   content: string;
@@ -80,10 +84,11 @@ export class ReportService {
   delete(id: number) {
     return this.http.delete<void>(`/api/reports/${id}`);
   }
-  review(r: Report, action: string, comment: string) {
+  review(r: Report, action: string, comment: string, location: string) {
     return this.http.post<Report>(`/api/reports/${r.id}/review`, {
       action,
       comment,
+      location,
       version: r.version,
     });
   }

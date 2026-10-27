@@ -21,3 +21,28 @@ export const superAdminGuard: CanActivateFn = () => {
       ),
     );
 };
+
+export const directorGuard: CanActivateFn = () => {
+  const auth = inject(AuthService),
+    router = inject(Router);
+  return auth
+    .check()
+    .pipe(
+      map(
+        (ok) =>
+          (ok && auth.isDirector()) || router.createUrlTree(["/dashboard"]),
+      ),
+    );
+};
+export const managementGuard: CanActivateFn = () => {
+  const auth = inject(AuthService),
+    router = inject(Router);
+  return auth
+    .check()
+    .pipe(
+      map(
+        (ok) =>
+          (ok && auth.isManagement()) || router.createUrlTree(["/dashboard"]),
+      ),
+    );
+};

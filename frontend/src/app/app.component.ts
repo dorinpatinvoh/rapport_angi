@@ -23,9 +23,17 @@ import {
         ><a routerLink="/rapports" routerLinkActive="active"
           ><i aria-hidden="true" class="bi bi-file-earmark-text"></i>Rapports</a
         >
-        @if (auth.isSuperAdmin()) {
+        @if (auth.isDirector()) {
           <a routerLink="/commerciaux" routerLinkActive="active"
             ><i aria-hidden="true" class="bi bi-people"></i>Commerciaux</a
+          >
+        }
+        @if (auth.isManagement()) {
+          <a routerLink="/organisation" routerLinkActive="active"
+            >Organisation et zones</a
+          >
+          <a routerLink="/syntheses" routerLinkActive="active"
+            >Synthèses et rapport général</a
           >
         }
         @if (!auth.user()) {
@@ -41,7 +49,11 @@ import {
           ><span>{{
             auth.isSuperAdmin()
               ? "Super administrateur"
-              : u.team || "Équipe à affecter"
+              : auth.isDirector()
+                ? "Directeur commercial"
+                : auth.isSupervisor()
+                  ? "Superviseur · " + (u.team || "")
+                  : u.team || "Équipe à affecter"
           }}</span
           ><button
             class="btn btn-outline-light mt-3"
