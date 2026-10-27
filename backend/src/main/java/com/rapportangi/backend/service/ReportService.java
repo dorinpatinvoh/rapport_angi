@@ -229,6 +229,43 @@ public class ReportService {
   private void apply(Report r, ReportRequestDto request, User user) {
     // Lock the author so parallel submissions cannot duplicate the same daily counters.
     users.findLockedById(user.getId()).orElseThrow();
+    if (request.getAzoRegistrations() != null) {
+      var entries = request.getAzoRegistrations();
+      if (
+        entries.size() > 500 ||
+        (!"AZO".equals(r.getTeam()) && !entries.isEmpty())
+      ) throw error(
+        HttpStatus.BAD_REQUEST,
+        "La liste des inscriptions est réservée aux rapports AZO (500 lignes maximum)."
+      );
+      var normalized = new java.util.ArrayList<AzoRegistration>();
+      for (var entry : entries) {
+        if (
+          entry == null ||
+          entry.firstName() == null ||
+          entry.lastName() == null ||
+          entry.firstName().isBlank() ||
+          entry.lastName().isBlank() ||
+          entry.firstName().length() > 100 ||
+          entry.lastName().length() > 100 ||
+          AzoProfiles.ALL.stream().noneMatch(p ->
+            p.code().equals(entry.profileCode())
+          )
+        ) throw error(
+          HttpStatus.BAD_REQUEST,
+          "Chaque inscription doit contenir un nom, un prénom et un profil AZO valide."
+        );
+        normalized.add(
+          new AzoRegistration(
+            entry.firstName().strip(),
+            entry.lastName().strip(),
+            entry.profileCode()
+          )
+        );
+      }
+      r.getAzoRegistrations().clear();
+      r.getAzoRegistrations().addAll(normalized);
+    }
     r.setTitle(request.getTitle().strip());
     r.setMode(request.getMode());
     r.setReportDate(
@@ -338,6 +375,19 @@ public class ReportService {
   private ReportResponseDto map(Report r) {
     var d = new ReportResponseDto();
     d.setId(r.getId());
+    d.setAzoRegistrations(
+      r
+        .getAzoRegistrations()
+        .stream()
+        .map(e ->
+          new AzoRegistrationDto(
+            e.getFirstName(),
+            e.getLastName(),
+            e.getProfileCode()
+          )
+        )
+        .toList()
+    );
     d.setGoalCounts(new java.util.TreeMap<>(r.getGoalCounts()));
     d.setSupervisorId(
       r.getSupervisor() == null ? null : r.getSupervisor().getId()

@@ -11,7 +11,13 @@ export interface AzoProfile {
   label: string;
   group: string;
 }
+export interface AzoRegistration {
+  firstName: string;
+  lastName: string;
+  profileCode: string;
+}
 export interface Report {
+  azoRegistrations: AzoRegistration[];
   goalCounts: Partial<Record<string, number>>;
   supervisorId: number | null;
   zone: string | null;
@@ -36,6 +42,7 @@ export interface Report {
   reviews: Review[];
 }
 export interface ReportInput {
+  azoRegistrations: AzoRegistration[];
   goalCounts: Record<string, number>;
   profileCounts: Record<string, number>;
   title: string;

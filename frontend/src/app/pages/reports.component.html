@@ -249,6 +249,115 @@
             </div>
           </section>
         </div>
+        @if (isAzo()) {
+          <div class="col-12">
+            <section class="stats-box" aria-labelledby="azoRegistrationsTitle">
+              <h3 id="azoRegistrationsTitle" class="h5">
+                Personnes inscrites sur AZO
+              </h3>
+              <p class="small text-secondary">
+                Ajoutez le nom, le prénom et le profil de chaque personne
+                inscrite pendant cette journée. Pour plusieurs profils, ajoutez
+                une ligne par profil. Cette liste est déclarée par vous ; les
+                compteurs des profils et des objectifs se renseignent
+                séparément.
+              </p>
+              @for (
+                row of registrationForm.controls;
+                track row;
+                let i = $index
+              ) {
+                <fieldset
+                  [formGroup]="row"
+                  class="border rounded p-3 mb-3"
+                  [disabled]="busy()"
+                >
+                  <legend class="float-none w-auto px-2 fs-6 fw-semibold">
+                    Inscription {{ i + 1 }}
+                  </legend>
+                  <div class="row g-3">
+                    <div class="col-sm-6">
+                      <label [for]="'azo-lastName-' + i" class="form-label"
+                        >Nom</label
+                      ><input
+                        [id]="'azo-lastName-' + i"
+                        formControlName="lastName"
+                        class="form-control"
+                        maxlength="100"
+                        autocomplete="off"
+                        required
+                      />
+                    </div>
+                    <div class="col-sm-6">
+                      <label [for]="'azo-firstName-' + i" class="form-label"
+                        >Prénom</label
+                      ><input
+                        [id]="'azo-firstName-' + i"
+                        formControlName="firstName"
+                        class="form-control"
+                        maxlength="100"
+                        autocomplete="off"
+                        required
+                      />
+                    </div>
+                    <div class="col-12">
+                      <label [for]="'azo-profile-' + i" class="form-label"
+                        >Profil d'inscription</label
+                      ><select
+                        [id]="'azo-profile-' + i"
+                        formControlName="profileCode"
+                        class="form-select"
+                        required
+                      >
+                        <option value="">Choisir un profil AZO</option>
+                        @for (group of profileGroups(); track group) {
+                          <optgroup [label]="group">
+                            @for (p of groupProfiles(group); track p.code) {
+                              <option [value]="p.code">{{ p.label }}</option>
+                            }
+                          </optgroup>
+                        }
+                      </select>
+                    </div>
+                  </div>
+                  @if (row.invalid && row.touched) {
+                    <p class="text-danger small mt-2" role="alert">
+                      Le nom, le prénom et le profil sont obligatoires pour
+                      cette ligne.
+                    </p>
+                  }
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger btn-sm mt-3"
+                    (click)="removeRegistration(i)"
+                    [attr.aria-label]="'Retirer inscription ' + (i + 1)"
+                  >
+                    Retirer cette personne
+                  </button>
+                </fieldset>
+              } @empty {
+                <p class="small text-secondary">
+                  Aucune personne ajoutée pour le moment.
+                </p>
+              }
+              <button
+                type="button"
+                class="btn btn-outline-primary"
+                (click)="addRegistration()"
+                [disabled]="
+                  busy() ||
+                  registrationForm.length >= 500 ||
+                  !profileDefs().length
+                "
+              >
+                Ajouter une personne
+              </button>
+              <p class="small text-secondary mt-2 mb-0">
+                {{ registrationForm.length }} / 500 lignes renseignées.
+              </p>
+            </section>
+          </div>
+        }
         <div class="col-12">
           <label for="reportContent" class="form-label">{{
             form.controls.mode.value === "STATS"
@@ -409,6 +518,36 @@
         </p>
       }
     </section>
+    @if (r.team === "AZO") {
+      <section
+        class="stats-box mb-4"
+        aria-labelledby="azoRegistrationReadTitle"
+      >
+        <h3 class="h5" id="azoRegistrationReadTitle">
+          Personnes inscrites sur AZO
+        </h3>
+        <p class="small text-secondary">
+          Liste déclarée par le commercial : nom, prénom et profil
+          d'inscription.
+        </p>
+        @for (entry of r.azoRegistrations; track $index) {
+          <div class="border-bottom py-3">
+            <dl class="row mb-0">
+              <dt class="col-sm-3">Nom</dt>
+              <dd class="col-sm-9 text-break">{{ entry.lastName }}</dd>
+              <dt class="col-sm-3">Prénom</dt>
+              <dd class="col-sm-9 text-break">{{ entry.firstName }}</dd>
+              <dt class="col-sm-3">Profil</dt>
+              <dd class="col-sm-9 mb-0">
+                {{ profileLabel(entry.profileCode) }}
+              </dd>
+            </dl>
+          </div>
+        } @empty {
+          <p class="small mb-0">Liste nominative non fournie.</p>
+        }
+      </section>
+    }
     <h3 class="h5">
       {{ r.mode === "STATS" ? "Observations" : "Déroulement de la journée" }}
     </h3>

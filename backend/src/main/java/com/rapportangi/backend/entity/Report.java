@@ -259,4 +259,17 @@ public class Report {
   public java.util.Map<String, Integer> getGoalCounts() {
     return goalCounts;
   }
+
+  @ElementCollection
+  @CollectionTable(
+    name = "report_azo_registrations",
+    joinColumns = @JoinColumn(name = "report_id")
+  )
+  @OrderColumn(name = "row_index")
+  private java.util.List<AzoRegistration> azoRegistrations =
+    new java.util.ArrayList<>();
+
+  public java.util.List<AzoRegistration> getAzoRegistrations() {
+    return azoRegistrations;
+  }
 }

@@ -228,4 +228,15 @@ public class ReportResponseDto {
   public void setZone(String value) {
     zone = value;
   }
+
+  private java.util.List<AzoRegistrationDto> azoRegistrations =
+    java.util.List.of();
+
+  public java.util.List<AzoRegistrationDto> getAzoRegistrations() {
+    return azoRegistrations;
+  }
+
+  public void setAzoRegistrations(java.util.List<AzoRegistrationDto> value) {
+    azoRegistrations = value;
+  }
 }

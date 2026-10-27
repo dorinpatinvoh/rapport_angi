@@ -119,6 +119,40 @@ public class ReportPdfService {
         );
         layout.space(16);
       }
+      if ("AZO".equals(report.getTeam())) {
+        layout.text("PERSONNES INSCRITES SUR AZO", 12, new Color(89, 22, 129));
+        if (report.getAzoRegistrations().isEmpty()) layout.text(
+          "Liste nominative non fournie.",
+          10,
+          Color.DARK_GRAY
+        );
+        else {
+          layout.text(
+            "Liste déclarée par le commercial : nom, prénom et profil d'inscription.",
+            9,
+            Color.DARK_GRAY
+          );
+          int row = 0;
+          for (var entry : report.getAzoRegistrations()) {
+            layout.text(
+              ++row +
+                ". Nom : " +
+                entry.lastName() +
+                " | Prénom : " +
+                entry.firstName(),
+              11,
+              Color.BLACK
+            );
+            layout.text(
+              "Profil : " + AzoProfiles.label(entry.profileCode()),
+              10,
+              Color.DARK_GRAY
+            );
+            layout.space(5);
+          }
+        }
+        layout.space(16);
+      }
       if (!report.getGoalCounts().isEmpty()) {
         layout.text(
           "RÉALISATIONS DU JOUR POUR LES OBJECTIFS",

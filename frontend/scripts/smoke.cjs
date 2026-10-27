@@ -169,6 +169,18 @@ const assert = require("node:assert/strict");
     .getByLabel("Déroulement de la journée")
     .fill("Visites à Cotonou. Plusieurs prospects intéressés.");
   await seller
+    .getByRole("button", { name: "Ajouter une personne", exact: true })
+    .click();
+  await seller.locator("#azo-lastName-0").fill("Dossou");
+  await seller.locator("#azo-firstName-0").fill("Élise");
+  await seller.locator("#azo-profile-0").selectOption("CLIENT");
+  await seller
+    .getByRole("button", { name: "Ajouter une personne", exact: true })
+    .click();
+  await seller
+    .getByRole("button", { name: "Retirer inscription 2", exact: true })
+    .click();
+  await seller
     .getByLabel("Enregistrement", { exact: true })
     .selectOption("SUBMITTED");
   await seller
@@ -207,6 +219,15 @@ const assert = require("node:assert/strict");
   await seller
     .getByRole("button", { name: "Corriger / compléter", exact: true })
     .click();
+  await expect(seller.locator("#azo-firstName-0")).toHaveValue("Élise");
+  await seller.locator("#azo-firstName-0").fill("Élise-Marie");
+  await seller.locator("#azo-profile-0").selectOption("SPEEDER_MOTO_ESSENCE");
+  await seller
+    .getByRole("button", { name: "Ajouter une personne", exact: true })
+    .click();
+  await seller.locator("#azo-lastName-1").fill("Akindélé");
+  await seller.locator("#azo-firstName-1").fill("Marc");
+  await seller.locator("#azo-profile-1").selectOption("AGENCE_PRO");
   await seller
     .getByLabel("Comment souhaitez-vous faire votre bilan ?")
     .selectOption("STATS");
@@ -315,6 +336,15 @@ const assert = require("node:assert/strict");
     .filter({ hasText: "Prospection mobile test" })
     .getByRole("button", { name: "Lire le rapport", exact: true })
     .click();
+  const registrationDetail = seller.getByRole("region", {
+    name: "Personnes inscrites sur AZO",
+    exact: true,
+  });
+  await expect(registrationDetail).toContainText("Élise-Marie");
+  await expect(registrationDetail).toContainText("Dossou");
+  await expect(registrationDetail).toContainText("Speeder moto à essence");
+  await expect(registrationDetail).toContainText("Akindélé");
+  await expect(registrationDetail).toContainText("Agence PRO");
   const download = seller.waitForEvent("download");
   await seller
     .getByRole("button", { name: "Télécharger le PDF", exact: true })
@@ -380,7 +410,7 @@ const assert = require("node:assert/strict");
     }
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: director nomination, supervisor zone, commercial assignment, scoped routing, precise correction, monthly goals, supervisor summary, director read-only general report, signup, activation, commercial creation, login, written report, return, stats report, resubmission, confirmation, AZO profile breakdown, PDF download, admin password reset, stale session invalidation, forgot-password form, logout, 360/390/768/1440px without overflow; no browser errors.",
+    "PASS: director nomination, supervisor zone, commercial assignment, scoped routing, precise correction, monthly goals, supervisor summary, director read-only general report, signup, activation, commercial creation, login, written report, return, stats report, resubmission, confirmation, AZO profile breakdown, named AZO registrations with add/remove/edit and persisted profiles, PDF download, admin password reset, stale session invalidation, forgot-password form, logout, 360/390/768/1440px without overflow; no browser errors.",
   );
   await browser.close();
 })().catch((error) => {

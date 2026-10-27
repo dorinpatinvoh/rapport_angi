@@ -4,6 +4,7 @@ import { Goal, SalesService, goalLabels } from "../core/sales.service";
 import { DatePipe } from "@angular/common";
 import { HttpClient } from "@angular/common/http";
 import {
+  FormArray,
   FormBuilder,
   FormControl,
   FormGroup,
@@ -14,6 +15,7 @@ import { finalize, switchMap } from "rxjs";
 import { AuthService } from "../core/auth.service";
 import {
   AzoProfile,
+  AzoRegistration,
   apiError,
   Report,
   ReportService,
@@ -117,6 +119,43 @@ export class ReportsComponent {
   readonly profileGroups = computed(() => [
     ...new Set(this.profileDefs().map((p) => p.group)),
   ]);
+  readonly registrationForm = new FormArray<
+    FormGroup<{
+      firstName: FormControl<string>;
+      lastName: FormControl<string>;
+      profileCode: FormControl<string>;
+    }>
+  >([]);
+  addRegistration(entry?: AzoRegistration) {
+    if (this.registrationForm.length >= 500 || this.busy()) return;
+    this.registrationForm.push(
+      this.fb.nonNullable.group({
+        firstName: [
+          entry?.firstName ?? "",
+          [
+            Validators.required,
+            Validators.pattern(/\S/),
+            Validators.maxLength(100),
+          ],
+        ],
+        lastName: [
+          entry?.lastName ?? "",
+          [
+            Validators.required,
+            Validators.pattern(/\S/),
+            Validators.maxLength(100),
+          ],
+        ],
+        profileCode: [entry?.profileCode ?? "", Validators.required],
+      }),
+    );
+  }
+  removeRegistration(index: number) {
+    if (!this.busy()) this.registrationForm.removeAt(index);
+  }
+  profileLabel(code: string) {
+    return this.profileDefs().find((p) => p.code === code)?.label ?? code;
+  }
   readonly profileForm = new FormGroup<Record<string, FormControl<number>>>({});
   isAzo() {
     return (
@@ -234,6 +273,8 @@ export class ReportsComponent {
     this.jump("report-detail");
   }
   edit(r?: Report) {
+    this.registrationForm.clear();
+    for (const entry of r?.azoRegistrations ?? []) this.addRegistration(entry);
     this.goalForm.reset();
     if (r?.goalCounts) this.goalForm.patchValue(r.goalCounts);
     this.editing.set(r ?? null);
@@ -258,6 +299,14 @@ export class ReportsComponent {
     this.jump("report-form");
   }
   save() {
+    if (this.isAzo() && this.registrationForm.invalid) {
+      this.registrationForm.markAllAsTouched();
+      this.error.set(
+        "Complétez le nom, le prénom et le profil de chaque personne inscrite, ou retirez la ligne incomplète.",
+      );
+      return;
+    }
+
     if (
       this.form.invalid ||
       this.goalForm.invalid ||
@@ -275,6 +324,7 @@ export class ReportsComponent {
     }
     const data = {
       ...this.form.getRawValue(),
+      azoRegistrations: this.isAzo() ? this.registrationForm.getRawValue() : [],
       goalCounts: Object.fromEntries(
         this.goalDefs().map((g) => [
           g.code,

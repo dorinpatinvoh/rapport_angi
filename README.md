@@ -266,3 +266,24 @@ Les changements de fonction d'un commercial avec des rapports en cours sont bloq
 - Les rapports acceptent `goalCounts` (entiers 0..1 000 000), codes AZO `AGENCES_FLOTTE`, `SPEEDERS_INDEPENDANTS`, `CLIENTS` ; codes Zehami `PROFESSIONNELS`, `UTILISATEURS`.
 
 L'API mobile peut aussi renvoyer ce champ optionnel, par exemple `"goalCounts":{"AGENCES_FLOTTE":2,"SPEEDERS_INDEPENDANTS":4,"CLIENTS":12}`. Lors d'un import, les valeurs du navigateur sont ignorées et seules les réalisations renvoyées par l'API sont conservées. Si ce champ manque, la répartition reste non fournie. Aucune connexion réelle à AZO ou Zehami n'est activée par cette mise à jour.
+
+## Personnes inscrites dans les rapports AZO
+
+Dans un rapport **AZO**, écrit ou statistique, la rubrique **Personnes inscrites sur AZO** permet d'ajouter plusieurs lignes avec **nom, prénom et profil d'inscription**. Les profils proposés sont ceux du catalogue AZO déjà utilisé pour les compteurs. Une ligne correspond à une inscription à un profil ; une personne ayant plusieurs profils peut figurer sur plusieurs lignes. Les homonymes ne sont pas bloqués.
+
+Le commercial peut ajouter, corriger ou retirer une ligne tant que son rapport est en brouillon ou renvoyé pour correction. La liste est conservée à l'envoi et apparaît dans la lecture du rapport et son PDF, avec pagination si nécessaire. Les droits existants s'appliquent également aux noms : le superviseur affecté et la direction peuvent consulter le rapport, les autres commerciaux n'y ont pas accès.
+
+Cette liste est déclarée par le commercial, y compris lorsqu'il importe ses compteurs depuis une API mobile. Elle ne modifie pas automatiquement les compteurs de profils, le nombre de comptes uniques ou les objectifs mensuels. Les anciens rapports restent sans liste nominative et indiquent **Liste nominative non fournie**. Zehami ne propose pas cette rubrique.
+
+La migration **V6** crée la table associée sans modifier les données existantes. Les API de création/modification acceptent un champ optionnel `azoRegistrations` :
+
+```json
+{
+  "azoRegistrations": [
+    { "lastName": "Dossou", "firstName": "Élise", "profileCode": "CLIENT" },
+    { "lastName": "Akindélé", "firstName": "Marc", "profileCode": "AGENCE_PRO" }
+  ]
+}
+```
+
+Chaque ligne exige un nom et un prénom non vides (100 caractères maximum chacun) et un code de profil AZO connu. Maximum : 500 lignes par rapport. Une liste non vide sur un rapport Zehami est rejetée. Lors d'une modification, l'absence du champ conserve la liste existante pour rester compatible avec les anciens clients API ; `[]` vide explicitement la liste.

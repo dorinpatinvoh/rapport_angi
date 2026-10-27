@@ -165,4 +165,16 @@ public class ReportRequestDto {
   public void setGoalCounts(java.util.Map<String, Integer> value) {
     goalCounts = value;
   }
+
+  @jakarta.validation.Valid
+  @jakarta.validation.constraints.Size(max = 500)
+  private java.util.List<@jakarta.validation.constraints.NotNull AzoRegistrationDto> azoRegistrations;
+
+  public java.util.List<AzoRegistrationDto> getAzoRegistrations() {
+    return azoRegistrations;
+  }
+
+  public void setAzoRegistrations(java.util.List<AzoRegistrationDto> value) {
+    azoRegistrations = value;
+  }
 }
