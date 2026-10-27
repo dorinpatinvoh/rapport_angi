@@ -41,3 +41,62 @@ jobs:
         working-directory: frontend
       - run: npm run test:smoke
         working-directory: frontend
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rapport_render_ci
+          POSTGRES_USER: rapport_ci
+          POSTGRES_PASSWORD: isolated-ci-database-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rapport_ci -d rapport_render_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Render backend image
+        run: docker build --tag rapport-angi-backend:ci backend
+      - name: Verify container startup, PostgreSQL migrations and login
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name rapport-render-ci --network host --memory 512m \
+            -e PORT=10000 \
+            -e DB_URL=jdbc:postgresql://127.0.0.1:5432/rapport_render_ci \
+            -e DB_USERNAME=rapport_ci \
+            -e DB_PASSWORD=isolated-ci-database-only \
+            -e BOOTSTRAP_ADMIN_EMAIL=qa-container@example.test \
+            -e BOOTSTRAP_ADMIN_PASSWORD=isolated-ci-admin-password \
+            rapport-angi-backend:ci
+          trap 'docker logs rapport-render-ci; docker rm -f rapport-render-ci' EXIT
+          ready=false
+          for attempt in {1..120}; do
+            if curl --fail --silent --cookie-jar /tmp/rapport-ci.cookies \
+              http://127.0.0.1:10000/api/auth/csrf > /tmp/rapport-ci.csrf.json; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" = true
+          csrf_token=$(python3 -c 'import json; print(json.load(open("/tmp/rapport-ci.csrf.json"))["token"])')
+          for attempt in {1..20}; do
+            login_status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              --cookie /tmp/rapport-ci.cookies --cookie-jar /tmp/rapport-ci.cookies \
+              --header "X-XSRF-TOKEN: $csrf_token" \
+              --data-urlencode 'email=qa-container@example.test' \
+              --data-urlencode 'password=isolated-ci-admin-password' \
+              http://127.0.0.1:10000/api/auth/login)
+            if test "$login_status" = 204; then break; fi
+            sleep 1
+          done
+          test "$login_status" = 204
+          curl --fail --silent --cookie /tmp/rapport-ci.cookies \
+            http://127.0.0.1:10000/api/reports > /tmp/rapport-ci.reports.json
+          python3 -c 'import json; assert json.load(open("/tmp/rapport-ci.reports.json")) == []'

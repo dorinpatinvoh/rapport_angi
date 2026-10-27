@@ -287,3 +287,39 @@ La migration **V6** crée la table associée sans modifier les données existant
 ```
 
 Chaque ligne exige un nom et un prénom non vides (100 caractères maximum chacun) et un code de profil AZO connu. Maximum : 500 lignes par rapport. Une liste non vide sur un rapport Zehami est rejetée. Lors d'une modification, l'absence du champ conserve la liste existante pour rester compatible avec les anciens clients API ; `[]` vide explicitement la liste.
+
+## Backend sur Render avec Docker
+
+Le backend Java 21 dispose de `backend/Dockerfile` et d'un contexte Docker limité à `backend`. L'image finale utilise un JRE et un utilisateur sans privilèges. Elle exécute le JAR ; aucun serveur de développement ni PostgreSQL local n'est lancé dans le conteneur. Le frontend LWS se prépare séparément : cette étape fournit uniquement le backend.
+
+Dans **New Web Service**, sélectionner le dépôt `dorinpatinvoh/rapport_angi`, puis :
+
+| Champ | Valeur |
+| --- | --- |
+| Name | `rapport-angi-backend` |
+| Language | `Docker` |
+| Branch | `main` |
+| Root Directory | `backend` |
+| Dockerfile Path | `Dockerfile` (relatif à Root Directory) |
+| Docker Build Context | `.` si ce champ est proposé |
+| Docker Command | laisser vide (utilise ENTRYPOINT) |
+| Instance | `Free` pour un essai |
+
+Les champs Build Command / Start Command de Node ne sont pas utilisés en mode Docker. Render fournit `PORT` ; Spring écoute déjà `${PORT:8080}` sur toutes les interfaces par défaut. Conserver le contrôle de santé TCP par défaut à cette étape.
+
+Avant de lancer le service, configurer une base PostgreSQL dédiée aux rapports, puis les variables Render :
+
+- `DB_URL` : URL JDBC, par exemple `jdbc:postgresql://HOTE:5432/BASE?sslmode=require` pour un fournisseur exigeant TLS. Une URL commençant par `postgresql://` doit être adaptée au format JDBC ; renseigner séparément les identifiants ci-dessous.
+- `DB_USERNAME` et `DB_PASSWORD` : identifiants de cette base.
+- `APP_PUBLIC_URL=https://rapports.angidsnpro.com` : adresse du frontend, utilisée notamment pour les liens de réinitialisation.
+- `SESSION_COOKIE_SECURE=true` : cookies de session transmis uniquement par HTTPS.
+- `SERVER_FORWARD_HEADERS_STRATEGY=framework` : prise en compte du proxy HTTPS de Render.
+- Au premier démarrage d'une **nouvelle base**, `BOOTSTRAP_ADMIN_EMAIL` et `BOOTSTRAP_ADMIN_PASSWORD` créent le SUPER_ADMIN. Fournir son propre secret d'au moins 12 caractères, limité à 72 octets UTF-8. Retirer ces deux variables après la création du compte, puis redéployer. Ne pas activer `BOOTSTRAP_ADMIN_RESET_PASSWORD` pour une création normale.
+
+La nouvelle base sera initialisée par Flyway. Les données de la base locale ne sont pas transférées automatiquement. Ne pas pointer ce service vers la base métier d'AZO. Si des comptes ou rapports locaux doivent être conservés, préparer leur transfert avant de démarrer les saisies en ligne.
+
+Les secrets se saisissent dans Render, jamais dans Git, le Dockerfile ou une capture partagée. Les variables SMTP existantes restent optionnelles ; sur Render Free, les ports SMTP usuels sont bloqués, donc l'envoi des liens email nécessite une adaptation à un service d'email via HTTPS ou un hébergement adapté. L'application conserve la récupération locale de l'administrateur et l'assistance du SUPER_ADMIN pour les commerciaux.
+
+L'offre gratuite peut se mettre en veille et sa base PostgreSQL gratuite a une durée limitée : choisir une base durable avant un usage quotidien. L'accès depuis le frontend LWS nécessite ensuite la configuration de l'origine autorisée, des sessions et du jeton CSRF pour les deux sous-domaines ; changer l'URL du frontend seul ne termine pas cette intégration.
+
+La CI construit l'image et vérifie son démarrage dans une limite de 512 Mo avec une base PostgreSQL 16 isolée, les migrations, le cookie CSRF et une connexion SUPER_ADMIN de test.
