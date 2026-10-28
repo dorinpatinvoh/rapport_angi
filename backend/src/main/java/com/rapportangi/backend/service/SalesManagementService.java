@@ -20,19 +20,22 @@ public class SalesManagementService {
   private final ReportRepository reports;
   private final SupervisorSummaryRepository summaries;
   private final SalesAccess access;
+  private final AccountService accounts;
 
   public SalesManagementService(
     UserRepository users,
     RoleRepository roles,
     ReportRepository reports,
     SupervisorSummaryRepository summaries,
-    SalesAccess access
+    SalesAccess access,
+    AccountService accounts
   ) {
     this.users = users;
     this.roles = roles;
     this.reports = reports;
     this.summaries = summaries;
     this.access = access;
+    this.accounts = accounts;
   }
 
   public record Member(
@@ -86,6 +89,30 @@ public class SalesManagementService {
       )
       .map(this::member)
       .toList();
+  }
+
+  public Member create(
+    com.rapportangi.backend.dto.CommercialRequest request,
+    String role,
+    String zone,
+    Authentication auth
+  ) {
+    var actor = access.current(auth);
+    if (
+      !director(actor) ||
+      !(
+        "SUPERVISEUR".equals(role) ||
+        ("DIRECTEUR_COMMERCIAL".equals(role) && has(actor, "SUPER_ADMIN"))
+      )
+    ) {
+      throw error(
+        HttpStatus.FORBIDDEN,
+        "Création de cette fonction non autorisée."
+      );
+    }
+    // Creation and role assignment share this transaction: a failure leaves no partial account.
+    var created = accounts.create(request, true);
+    return assign(created.id(), role, request.team(), null, zone, auth);
   }
 
   public Member assign(

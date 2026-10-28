@@ -30,6 +30,130 @@ import { apiError } from "../core/report.service";
     @if (success()) {
       <div role="status" class="alert alert-success">{{ success() }}</div>
     }
+    @if (auth.isDirector()) {
+      <details class="panel mb-4">
+        <summary class="fw-semibold">Créer un responsable</summary>
+        <p class="text-secondary mt-3">
+          Le compte sera actif immédiatement. Pour créer un commercial, utilisez
+          la page Commerciaux.
+        </p>
+        <form (ngSubmit)="createManager()" #createForm="ngForm">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label for="managerFirst" class="form-label"
+                >Prénom du responsable</label
+              ><input
+                id="managerFirst"
+                name="managerFirst"
+                [(ngModel)]="newAccount.firstName"
+                class="form-control"
+                required
+                pattern=".*\\S.*"
+                maxlength="100"
+              />
+            </div>
+            <div class="col-sm-6">
+              <label for="managerLast" class="form-label"
+                >Nom du responsable</label
+              ><input
+                id="managerLast"
+                name="managerLast"
+                [(ngModel)]="newAccount.lastName"
+                class="form-control"
+                required
+                pattern=".*\\S.*"
+                maxlength="100"
+              />
+            </div>
+            <div class="col-sm-6">
+              <label for="managerEmail" class="form-label"
+                >Email du responsable</label
+              ><input
+                id="managerEmail"
+                name="managerEmail"
+                [(ngModel)]="newAccount.email"
+                class="form-control"
+                type="email"
+                email
+                required
+                maxlength="150"
+                autocomplete="off"
+              />
+            </div>
+            <div class="col-sm-6">
+              <label for="managerPassword" class="form-label"
+                >Mot de passe du responsable</label
+              ><input
+                id="managerPassword"
+                name="managerPassword"
+                [(ngModel)]="newAccount.password"
+                class="form-control"
+                type="password"
+                required
+                minlength="12"
+                maxlength="72"
+                autocomplete="new-password"
+              /><span class="form-text"
+                >Au moins 12 caractères, limité à 72 octets UTF-8.</span
+              >
+            </div>
+            <div class="col-sm-6">
+              <label for="managerRole" class="form-label"
+                >Fonction du responsable</label
+              ><select
+                id="managerRole"
+                name="managerRole"
+                [(ngModel)]="newRole"
+                class="form-select"
+                required
+              >
+                <option value="SUPERVISEUR">Superviseur</option>
+                @if (auth.isSuperAdmin()) {
+                  <option value="DIRECTEUR_COMMERCIAL">
+                    Directeur commercial
+                  </option>
+                }
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label for="managerTeam" class="form-label"
+                >Équipe du responsable</label
+              ><select
+                id="managerTeam"
+                name="managerTeam"
+                [(ngModel)]="newAccount.team"
+                class="form-select"
+                required
+              >
+                <option value="AZO">AZO</option>
+                <option value="ZEHAMI">Zehami</option>
+              </select>
+            </div>
+            @if (newRole === "SUPERVISEUR") {
+              <div class="col-12">
+                <label for="managerZone" class="form-label"
+                  >Zone du nouveau superviseur</label
+                ><input
+                  id="managerZone"
+                  name="managerZone"
+                  [(ngModel)]="newZone"
+                  class="form-control"
+                  required
+                  pattern=".*\\S.*"
+                  maxlength="150"
+                />
+              </div>
+            }
+          </div>
+          <button
+            class="btn btn-primary mt-3"
+            [disabled]="createForm.invalid || busy()"
+          >
+            Créer le responsable
+          </button>
+        </form>
+      </details>
+    }
     @if (loading()) {
       <p role="status">Chargement…</p>
     }
@@ -165,6 +289,50 @@ export class OrganizationComponent {
   team = "AZO";
   zone = "";
   supervisorId: number | null = null;
+  newAccount = {
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    team: "AZO",
+  };
+  newRole = "SUPERVISEUR";
+  newZone = "";
+  createManager() {
+    if (this.busy()) return;
+    this.busy.set(true);
+    this.error.set("");
+    this.success.set("");
+    this.auth
+      .csrf()
+      .pipe(
+        switchMap(() =>
+          this.api.createMember({
+            account: this.newAccount,
+            role: this.newRole,
+            zone: this.newRole === "SUPERVISEUR" ? this.newZone : "",
+          }),
+        ),
+        finalize(() => this.busy.set(false)),
+      )
+      .subscribe({
+        next: (member) => {
+          this.newAccount = {
+            firstName: "",
+            lastName: "",
+            email: "",
+            password: "",
+            team: "AZO",
+          };
+          this.newZone = "";
+          this.success.set(
+            `${this.roleLabel(member.role)} créé et activé. Transmettez-lui personnellement ses identifiants.`,
+          );
+          this.load();
+        },
+        error: (e) => this.error.set(apiError(e)),
+      });
+  }
   constructor() {
     this.load();
   }

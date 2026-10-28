@@ -348,3 +348,16 @@ Avec FileZilla, envoyer **le contenu** de `D:\rapport\frontend\dist\frontend\bro
 Ouvrir ensuite `/connexion`, se connecter avec un compte existant, recharger `/rapports` et essayer la lecture d'un rapport et son PDF. La construction locale normale `npm run build` et `npm start` continuent d'utiliser `/api` et le proxy de développement. La configuration `cross-origin` est réservée à la QA avec une base H2 isolée, jamais à LWS.
 
 La CI vérifie le même parcours complet dans un vrai navigateur avec deux origines différentes, sans proxy API, puis fournit l'artefact `frontend-lws` contenant les fichiers prêts à transférer.
+
+
+## Création directe de l'encadrement et email entreprise
+
+Depuis **Organisation et zones → Créer un responsable**, le SUPER_ADMIN peut créer un directeur commercial ou un superviseur. Le directeur peut créer un superviseur et sa zone, puis affecter les commerciaux. Les commerciaux se créent toujours dans **Commerciaux → Créer directement un commercial**. Les comptes sont actifs à leur création et utilisent un email et un mot de passe initial ; les mots de passe ne sont jamais renvoyés dans les réponses API. Un directeur ne peut ni créer ni modifier un autre directeur, ni créer un administrateur. La création du compte et l'affectation du rôle sont transactionnelles.
+
+`POST /api/sales/members` reçoit `{ "account": { "firstName": "…", "lastName": "…", "email": "…", "password": "…", "team": "AZO" }, "role": "DIRECTEUR_COMMERCIAL", "zone": "" }`. Pour un superviseur, `role` vaut `SUPERVISEUR` et la zone non vide est obligatoire.
+
+La migration Java V7 remplace l'email de l'unique SUPER_ADMIN existant par `angidsnpro@gmail.com`, en conservant son identifiant, son état et son mot de passe. Elle invalide ses anciennes sessions et ses liens de réinitialisation. Elle ne crée aucun compte et n'accorde aucun rôle. Si plusieurs SUPER_ADMIN existent ou si l'adresse appartient déjà à un autre compte, elle ne choisit pas arbitrairement et affiche un avertissement ; vérifier alors le compte dans Neon. Sur une base neuve sans SUPER_ADMIN, utiliser le bootstrap habituel avec l'email entreprise.
+
+**Récupération Render en cours :** avant le redéploiement de cette version, renseigner `BOOTSTRAP_ADMIN_EMAIL=angidsnpro@gmail.com` si la migration doit renommer l'unique SUPER_ADMIN, conserver le mot de passe choisi dans `BOOTSTRAP_ADMIN_PASSWORD` et `BOOTSTRAP_ADMIN_RESET_PASSWORD=true`. Ne pas créer un autre compte pour contourner une ambiguïté de migration. Après une connexion réussie, supprimer les trois variables ensemble puis redéployer. Le changement d'email ne définit aucun mot de passe public.
+
+Après un `git pull origin main`, reconstruire le frontend avec `npm ci` puis `npm run build:lws` et transférer à nouveau le contenu de `frontend/dist/frontend/browser/` dans le dossier LWS du sous-domaine.

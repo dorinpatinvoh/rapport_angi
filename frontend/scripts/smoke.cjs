@@ -106,27 +106,47 @@ const assert = require("node:assert/strict");
     .getByRole("button", { name: "Activer le compte", exact: true })
     .click();
   await admin.getByRole("status").filter({ hasText: "mis à jour" }).waitFor();
-  async function createAccount(page, first, last, email) {
-    await page.getByRole("link", { name: "Commerciaux", exact: true }).click();
-    const details = page.locator("details").filter({
-      has: page.getByText("Créer directement un commercial", { exact: true }),
-    });
-    if (!(await details.evaluate((el) => el.open)))
-      await page
-        .getByText("Créer directement un commercial", { exact: true })
-        .click();
-    await page.getByLabel("Prénom", { exact: true }).fill(first);
-    await page.getByLabel("Nom", { exact: true }).fill(last);
-    await page.getByLabel("Email", { exact: true }).fill(email);
-    await page.getByLabel("Mot de passe initial").fill(password);
-    await page.locator("#createTeam").selectOption("AZO");
+  async function createManager(page, first, email, role) {
     await page
-      .getByRole("button", { name: "Créer et activer le compte", exact: true })
+      .getByRole("link", { name: "Organisation et zones", exact: true })
+      .click();
+    await page.getByText("Créer un responsable", { exact: true }).click();
+    await page.getByLabel("Prénom du responsable", { exact: true }).fill(first);
+    await page.getByLabel("Nom du responsable", { exact: true }).fill("Test");
+    await page.getByLabel("Email du responsable", { exact: true }).fill(email);
+    await page
+      .getByLabel("Mot de passe du responsable", { exact: true })
+      .fill(password);
+    await page
+      .getByLabel("Fonction du responsable", { exact: true })
+      .selectOption(role);
+    if (role === "SUPERVISEUR") {
+      assert.equal(
+        await page
+          .locator('#managerRole option[value="DIRECTEUR_COMMERCIAL"]')
+          .count(),
+        0,
+      );
+      await page
+        .getByLabel("Zone du nouveau superviseur", { exact: true })
+        .fill("Cotonou Nord");
+    }
+    const previousViewport = page.viewportSize();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await noOverflow(page);
+    await page.screenshot({
+      path: "/tmp/rapport-manager-mobile.png",
+      fullPage: true,
+    });
+    await page.setViewportSize(previousViewport);
+    await page
+      .getByRole("button", { name: "Créer le responsable", exact: true })
       .click();
     await page
       .getByRole("status")
       .filter({ hasText: "créé et activé" })
       .waitFor();
+    await noOverflow(page);
   }
   async function assign(page, email, role, supervisorId = null) {
     await page
@@ -153,11 +173,14 @@ const assert = require("node:assert/strict");
       .filter({ hasText: "Affectation enregistrée" })
       .waitFor();
   }
-  await createAccount(admin, "Direction", "Test", directorEmail);
-  await assign(admin, directorEmail, "DIRECTEUR_COMMERCIAL");
+  await createManager(
+    admin,
+    "Direction",
+    directorEmail,
+    "DIRECTEUR_COMMERCIAL",
+  );
   await login(director, directorEmail, password);
-  await createAccount(director, "Superviseur", "Test", supervisorEmail);
-  await assign(director, supervisorEmail, "SUPERVISEUR");
+  await createManager(director, "Superviseur", supervisorEmail, "SUPERVISEUR");
   await director
     .locator("article")
     .filter({ hasText: sellerEmail })
@@ -423,7 +446,7 @@ const assert = require("node:assert/strict");
     }
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: director nomination, supervisor zone, commercial assignment, scoped routing, precise correction, monthly goals, supervisor summary, director read-only general report, signup, activation, commercial creation, login, written report, return, stats report, resubmission, confirmation, AZO profile breakdown, named AZO registrations with add/remove/edit and persisted profiles, PDF download, admin password reset, stale session invalidation, forgot-password form, logout, 360/390/768/1440px without overflow; no browser errors.",
+    "PASS: direct creation of director by root and supervisor by director, supervisor zone, commercial assignment, scoped routing, precise correction, monthly goals, supervisor summary, director read-only general report, signup, activation, commercial creation, login, written report, return, stats report, resubmission, confirmation, AZO profile breakdown, named AZO registrations with add/remove/edit and persisted profiles, PDF download, admin password reset, stale session invalidation, forgot-password form, logout, 360/390/768/1440px without overflow; no browser errors.",
   );
   if (process.env.SMOKE_CROSS_ORIGIN) assert.ok(crossOriginWrites > 10);
   await browser.close();

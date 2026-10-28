@@ -63,6 +63,19 @@ export class SalesService {
   members() {
     return this.http.get<Member[]>("/api/sales/members");
   }
+  createMember(data: {
+    account: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      password: string;
+      team: string;
+    };
+    role: string;
+    zone: string;
+  }) {
+    return this.http.post<Member>("/api/sales/members", data);
+  }
   assign(
     id: number,
     data: {

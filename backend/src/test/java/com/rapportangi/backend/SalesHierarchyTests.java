@@ -493,4 +493,70 @@ class SalesHierarchyTests {
       )
     );
   }
+
+  @Test
+  void rootCreatesDirectorAndDirectorCreatesSupervisorDirectly()
+    throws Exception {
+    String account =
+      "{\"account\":{\"firstName\":\"Nouvelle\",\"lastName\":\"Direction\",\"email\":\"new-director@sales.test\",\"password\":\"new-director-password\",\"team\":\"AZO\"},\"role\":\"DIRECTEUR_COMMERCIAL\"}";
+    mvc
+      .perform(
+        post("/api/sales/members")
+          .with(authentication(auth(superadmin)))
+          .with(csrf())
+          .contentType("application/json")
+          .content(account)
+      )
+      .andExpect(status().isCreated())
+      .andExpect(jsonPath("$.role").value("DIRECTEUR_COMMERCIAL"))
+      .andExpect(jsonPath("$.enabled").value(true));
+    var created = users.findByEmail("new-director@sales.test").orElseThrow();
+    assertTrue(
+      passwords.matches("new-director-password", created.getPassword())
+    );
+    mvc
+      .perform(
+        post("/api/sales/members")
+          .with(authentication(auth(created)))
+          .with(csrf())
+          .contentType("application/json")
+          .content(
+            account
+              .replace("new-director@sales.test", "new-supervisor@sales.test")
+              .replace("DIRECTEUR_COMMERCIAL", "SUPERVISEUR")
+              .replace("\"role\":", "\"zone\":\"Calavi\",\"role\":")
+          )
+      )
+      .andExpect(status().isCreated())
+      .andExpect(jsonPath("$.role").value("SUPERVISEUR"))
+      .andExpect(jsonPath("$.zone").value("Calavi"));
+  }
+
+  @Test
+  void privilegedCreationCannotBeUsedForEscalation() throws Exception {
+    String account =
+      "{\"account\":{\"firstName\":\"Interdit\",\"lastName\":\"Test\",\"email\":\"forbidden-manager@sales.test\",\"password\":\"forbidden-password\",\"team\":\"AZO\"},\"role\":\"DIRECTEUR_COMMERCIAL\"}";
+    for (var actor : List.of(director, supervisor, seller)) {
+      mvc
+        .perform(
+          post("/api/sales/members")
+            .with(authentication(auth(actor)))
+            .with(csrf())
+            .contentType("application/json")
+            .content(account)
+        )
+        .andExpect(status().isForbidden());
+    }
+    assertTrue(users.findByEmail("forbidden-manager@sales.test").isEmpty());
+    mvc
+      .perform(
+        post("/api/sales/members")
+          .with(authentication(auth(superadmin)))
+          .with(csrf())
+          .contentType("application/json")
+          .content(account.replace("DIRECTEUR_COMMERCIAL", "SUPER_ADMIN"))
+      )
+      .andExpect(status().isBadRequest());
+    assertTrue(users.findByEmail("forbidden-manager@sales.test").isEmpty());
+  }
 }

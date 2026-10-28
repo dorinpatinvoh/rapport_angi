@@ -23,6 +23,24 @@ public class SalesController {
     return sales.members(a);
   }
 
+  public record CreateMember(
+    @Valid @NotNull com.rapportangi.backend.dto.CommercialRequest account,
+    @NotNull @Pattern(regexp = "DIRECTEUR_COMMERCIAL|SUPERVISEUR") String role,
+    @Size(max = 150) String zone
+  ) {}
+
+  @PostMapping("/members")
+  @org.springframework.security.access.prepost.PreAuthorize(
+    "hasAnyRole('SUPER_ADMIN','DIRECTEUR_COMMERCIAL')"
+  )
+  @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+  public SalesManagementService.Member create(
+    @Valid @RequestBody CreateMember r,
+    Authentication a
+  ) {
+    return sales.create(r.account(), r.role(), r.zone(), a);
+  }
+
   public record Assignment(
     @NotNull
     @Pattern(regexp = "COMMERCIAL|SUPERVISEUR|DIRECTEUR_COMMERCIAL")
