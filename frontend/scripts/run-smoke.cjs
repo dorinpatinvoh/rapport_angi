@@ -13,7 +13,7 @@ const args = [
     : []),
   "spring-boot:run",
   "-Dspring-boot.run.useTestClasspath=true",
-  "-Dspring-boot.run.arguments=--spring.datasource.url=jdbc:h2:mem:smoke;MODE=PostgreSQL;DB_CLOSE_DELAY=-1 --spring.datasource.driver-class-name=org.h2.Driver --spring.datasource.username=sa --spring.datasource.password= --spring.flyway.enabled=true --app.bootstrap.email=qa-admin@example.test --app.bootstrap.password=qa-test-password-2026 --server.port=8080 --server.address=127.0.0.1",
+  "-Dspring-boot.run.arguments=--spring.datasource.url=jdbc:h2:mem:smoke;MODE=PostgreSQL;DB_CLOSE_DELAY=-1 --spring.datasource.driver-class-name=org.h2.Driver --spring.datasource.username=sa --spring.datasource.password= --spring.flyway.enabled=true --app.bootstrap.email=qa-admin@example.test --app.bootstrap.password=qa-test-password-2026 --server.port=8080 --server.address=127.0.0.1 --app.public-url=http://127.0.0.1:4200",
 ];
 if (process.env.SMOKE_JAVA_VERSION)
   args.push("-Djava.version=" + process.env.SMOKE_JAVA_VERSION);

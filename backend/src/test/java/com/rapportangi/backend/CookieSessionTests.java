@@ -17,7 +17,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 // Isolation from Spring Security test's csrf() repository replacement in the other suite.
-@SpringBootTest
+@SpringBootTest(
+  properties = "app.allowed-origins=https://rapports.angidsnpro.com"
+)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
 class CookieSessionTests {
 
@@ -33,6 +35,8 @@ class CookieSessionTests {
   @Autowired
   PasswordEncoder passwords;
 
+  private static final String FRONTEND = "https://rapports.angidsnpro.com";
+
   @Test
   void cookieCsrfTokenWorksForAngular() throws Exception {
     var u = new User();
@@ -47,14 +51,28 @@ class CookieSessionTests {
       .apply(springSecurity())
       .build();
     var result = mvc
-      .perform(get("/api/auth/csrf"))
+      .perform(get("/api/auth/csrf").header("Origin", FRONTEND))
       .andExpect(status().isOk())
+      .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND))
+      .andExpect(header().string("Access-Control-Allow-Credentials", "true"))
+      .andExpect(header().string("Cache-Control", "no-store"))
       .andReturn();
     var cookie = result.getResponse().getCookie("XSRF-TOKEN");
     assertNotNull(cookie);
+    // CORS approval does not bypass CSRF for a state-changing request.
+    mvc
+      .perform(
+        post("/api/auth/login")
+          .header("Origin", FRONTEND)
+          .cookie(cookie)
+          .param("email", "cookie@angi.test")
+          .param("password", "strong-test-password")
+      )
+      .andExpect(status().isForbidden());
     var login = mvc
       .perform(
         post("/api/auth/login")
+          .header("Origin", FRONTEND)
           .cookie(cookie)
           .header("X-XSRF-TOKEN", cookie.getValue())
           .param("email", "cookie@angi.test")
@@ -66,7 +84,9 @@ class CookieSessionTests {
       .getRequest()
       .getSession(false);
     var renewed = mvc
-      .perform(get("/api/auth/csrf").session(session))
+      .perform(
+        get("/api/auth/csrf").header("Origin", FRONTEND).session(session)
+      )
       .andExpect(status().isOk())
       .andReturn()
       .getResponse()
@@ -92,5 +112,39 @@ class CookieSessionTests {
       )
       .andExpect(status().isNoContent());
     assertTrue(session.isInvalid());
+  }
+
+  @Test
+  void preflightAllowsOnlyTheConfiguredFrontend() throws Exception {
+    var mvc = MockMvcBuilders.webAppContextSetup(context)
+      .apply(springSecurity())
+      .build();
+    mvc
+      .perform(
+        options("/api/reports")
+          .header("Origin", FRONTEND)
+          .header("Access-Control-Request-Method", "POST")
+          .header("Access-Control-Request-Headers", "content-type,x-xsrf-token")
+      )
+      .andExpect(status().isOk())
+      .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND))
+      .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    for (String origin : java.util.List.of(
+      "https://evil.example",
+      "https://rapports.angidsnpro.com.evil.example",
+      "null"
+    )) {
+      mvc
+        .perform(
+          options("/api/reports")
+            .header("Origin", origin)
+            .header("Access-Control-Request-Method", "POST")
+        )
+        .andExpect(status().isForbidden())
+        .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+      mvc
+        .perform(get("/api/auth/csrf").header("Origin", origin))
+        .andExpect(status().isForbidden());
+    }
   }
 }

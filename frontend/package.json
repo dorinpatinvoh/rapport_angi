@@ -5,7 +5,8 @@
   "scripts": {
     "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build",
-    "test:smoke": "node scripts/run-smoke.cjs"
+    "test:smoke": "node scripts/run-smoke.cjs",
+    "build:lws": "ng build --configuration=lws"
   },
   "dependencies": {
     "@angular/common": "^20.3.0",

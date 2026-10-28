@@ -1,3 +1,4 @@
+import { apiUrl } from "../core/api-url";
 import { Component, computed, inject, signal } from "@angular/core";
 import { ActivatedRoute } from "@angular/router";
 import { Goal, SalesService, goalLabels } from "../core/sales.service";
@@ -28,6 +29,7 @@ import {
   templateUrl: "./reports.component.html",
 })
 export class ReportsComponent {
+  readonly apiUrl = apiUrl;
   private api = inject(ReportService);
   private sales = inject(SalesService);
   private route = inject(ActivatedRoute);

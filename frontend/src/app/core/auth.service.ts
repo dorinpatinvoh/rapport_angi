@@ -1,6 +1,7 @@
 import { computed, inject, Injectable, signal } from "@angular/core";
 import { HttpClient, HttpParams } from "@angular/common/http";
 import { catchError, map, of, switchMap, tap } from "rxjs";
+import { CsrfService } from "./csrf.service";
 export interface SessionUser {
   id: number;
   name: string;
@@ -12,6 +13,7 @@ export interface SessionUser {
 @Injectable({ providedIn: "root" })
 export class AuthService {
   private http = inject(HttpClient);
+  private tokens = inject(CsrfService);
   readonly user = signal<SessionUser | null>(null);
   readonly isSuperAdmin = computed(
     () => this.user()?.roles.includes("ROLE_SUPER_ADMIN") ?? false,
@@ -37,7 +39,7 @@ export class AuthService {
       ) ?? false,
   );
   csrf() {
-    return this.http.get("/api/auth/csrf");
+    return this.tokens.refresh();
   }
   restore() {
     return this.http
@@ -68,7 +70,10 @@ export class AuthService {
   logout() {
     return this.csrf().pipe(
       switchMap(() => this.http.post("/api/auth/logout", {})),
-      tap(() => this.user.set(null)),
+      tap(() => {
+        this.user.set(null);
+        this.tokens.clear();
+      }),
     );
   }
 }

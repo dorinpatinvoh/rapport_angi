@@ -1,3 +1,4 @@
+import { apiUrl } from "./core/api-url";
 import { AuthService } from "./core/auth.service";
 import { Component, inject, signal } from "@angular/core";
 import {
@@ -13,9 +14,10 @@ import {
   template: ` <div class="app-shell">
     <aside class="side">
       <a routerLink="/dashboard" class="brand-link"
-        ><img src="/api/branding/angi.jpeg" alt="ANGI DSN PRO SARL" /><span
-          >ANGI DSN PRO<small>Suivi commercial</small></span
-        ></a
+        ><img
+          [src]="apiUrl('/api/branding/angi.jpeg')"
+          alt="ANGI DSN PRO SARL"
+        /><span>ANGI DSN PRO<small>Suivi commercial</small></span></a
       >
       <nav aria-label="Navigation principale">
         <a routerLink="/dashboard" routerLinkActive="active"
@@ -78,6 +80,7 @@ import {
   </div>`,
 })
 export class AppComponent {
+  readonly apiUrl = apiUrl;
   readonly auth = inject(AuthService);
   private router = inject(Router);
   readonly busy = signal(false);

@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
           cache: maven
           cache-dependency-path: backend/pom.xml
       - run: bash mvnw --batch-mode verify
@@ -24,13 +24,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
           cache: maven
           cache-dependency-path: backend/pom.xml
       - run: npm ci --no-audit --no-fund
@@ -41,6 +41,22 @@ jobs:
         working-directory: frontend
       - run: npm run test:smoke
         working-directory: frontend
+      - name: Build for separate frontend and API origins
+        run: npm run build -- --configuration=cross-origin
+        working-directory: frontend
+      - name: Verify browser sessions, CSRF and full workflow across origins
+        run: npm run test:smoke
+        working-directory: frontend
+        env:
+          SMOKE_CROSS_ORIGIN: "true"
+      - name: Build files for LWS
+        run: npm run build:lws
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-lws
+          path: frontend/dist/frontend/browser/
+          include-hidden-files: true
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -15,6 +15,11 @@ const types = {
 };
 http
   .createServer((req, res) => {
+    if (req.url.startsWith("/api/") && process.env.SMOKE_CROSS_ORIGIN) {
+      res.writeHead(500);
+      res.end("Cross-origin QA must contact the backend directly");
+      return;
+    }
     if (req.url.startsWith("/api/")) {
       const upstream = http.request(
         {

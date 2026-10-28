@@ -320,6 +320,31 @@ La nouvelle base sera initialisée par Flyway. Les données de la base locale ne
 
 Les secrets se saisissent dans Render, jamais dans Git, le Dockerfile ou une capture partagée. Les variables SMTP existantes restent optionnelles ; sur Render Free, les ports SMTP usuels sont bloqués, donc l'envoi des liens email nécessite une adaptation à un service d'email via HTTPS ou un hébergement adapté. L'application conserve la récupération locale de l'administrateur et l'assistance du SUPER_ADMIN pour les commerciaux.
 
-L'offre gratuite peut se mettre en veille et sa base PostgreSQL gratuite a une durée limitée : choisir une base durable avant un usage quotidien. L'accès depuis le frontend LWS nécessite ensuite la configuration de l'origine autorisée, des sessions et du jeton CSRF pour les deux sous-domaines ; changer l'URL du frontend seul ne termine pas cette intégration.
+L'offre gratuite Render peut se mettre en veille. Utiliser une base durable dédiée (par exemple la base Neon déjà migrée) et vérifier les quotas de l'offre choisie.
 
 La CI construit l'image et vérifie son démarrage dans une limite de 512 Mo avec une base PostgreSQL 16 isolée, les migrations, le cookie CSRF et une connexion SUPER_ADMIN de test.
+
+
+## Frontend LWS et API Render sur deux sous-domaines
+
+Le frontend se déploie sur `https://rapports.angidsnpro.com`, et l'API sur `https://api-rapports.angidsnpro.com`. Les deux domaines doivent avoir un certificat HTTPS valide.
+
+Sur Render, conserver `APP_PUBLIC_URL=https://rapports.angidsnpro.com`, `SESSION_COOKIE_SECURE=true` et `SERVER_FORWARD_HEADERS_STRATEGY=framework`. L'origine autorisée CORS reprend `APP_PUBLIC_URL` par défaut. `APP_ALLOWED_ORIGINS` permet de fournir une liste d'origines exactes séparées par des virgules ; aucun joker. Ne pas autoriser l'ensemble des sous-domaines. Aucun changement de base ni nouvelle importation n'est nécessaire.
+
+Le frontend transmet les cookies uniquement vers son API et récupère le jeton CSRF depuis la réponse JSON `/api/auth/csrf`. Le jeton reste en mémoire, est renouvelé après connexion, et accompagne les écritures dans `X-XSRF-TOKEN`. Le backend garde la protection CSRF et autorise les requêtes CORS avec cookies depuis l'origine configurée. Les cookies restent propres à l'hôte API, sans domaine parent partagé.
+
+Depuis PowerShell :
+
+```powershell
+cd D:\rapport
+git pull origin main
+cd frontend
+npm ci
+npm run build:lws
+```
+
+Avec FileZilla, envoyer **le contenu** de `D:\rapport\frontend\dist\frontend\browser` dans `/rapports.angidsnpro.com/` : `index.html`, les fichiers JS/CSS et `.htaccess`, directement dans ce dossier. Ne pas envoyer le dossier `browser` lui-même, `node_modules`, les sources ou le backend. Conserver une copie locale de `default_index.html`, puis retirer cette page d'attente de ce seul dossier pour qu'elle n'interfère pas avec l'application. Ne pas modifier les autres sites du compte. `.htaccess` fournit le retour vers `index.html` pour les routes Angular ; penser à transférer les fichiers cachés. Le dossier local `dist` est généré et n'est pas versionné.
+
+Ouvrir ensuite `/connexion`, se connecter avec un compte existant, recharger `/rapports` et essayer la lecture d'un rapport et son PDF. La construction locale normale `npm run build` et `npm start` continuent d'utiliser `/api` et le proxy de développement. La configuration `cross-origin` est réservée à la QA avec une base H2 isolée, jamais à LWS.
+
+La CI vérifie le même parcours complet dans un vrai navigateur avec deux origines différentes, sans proxy API, puis fournit l'artefact `frontend-lws` contenant les fichiers prêts à transférer.

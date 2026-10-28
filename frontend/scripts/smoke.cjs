@@ -14,6 +14,7 @@ const assert = require("node:assert/strict");
     throw Error(
       "Set SMOKE_ADMIN_EMAIL and SMOKE_ADMIN_PASSWORD for an isolated QA instance",
     );
+  let crossOriginWrites = 0;
   const errors = [],
     tag = Date.now(),
     sellerEmail = `seller-${tag}@example.test`,
@@ -31,8 +32,20 @@ const assert = require("node:assert/strict");
     director = await browser.newPage({
       viewport: { width: 1440, height: 1000 },
     });
-  for (const page of [admin, seller, supervisor, director])
+  for (const page of [admin, seller, supervisor, director]) {
     page.on("pageerror", (e) => errors.push(e.message));
+    if (process.env.SMOKE_CROSS_ORIGIN)
+      page.on("request", (request) => {
+        if (["POST", "PUT", "DELETE"].includes(request.method())) {
+          assert.equal(new URL(request.url()).origin, "http://127.0.0.1:8080");
+          assert.ok(
+            request.headers()["x-xsrf-token"],
+            "Missing cross-origin CSRF token",
+          );
+          crossOriginWrites++;
+        }
+      });
+  }
   async function login(page, email, secret) {
     await page.goto(root + "/connexion");
     await page.getByLabel("E-mail", { exact: true }).fill(email);
@@ -412,6 +425,7 @@ const assert = require("node:assert/strict");
   console.log(
     "PASS: director nomination, supervisor zone, commercial assignment, scoped routing, precise correction, monthly goals, supervisor summary, director read-only general report, signup, activation, commercial creation, login, written report, return, stats report, resubmission, confirmation, AZO profile breakdown, named AZO registrations with add/remove/edit and persisted profiles, PDF download, admin password reset, stale session invalidation, forgot-password form, logout, 360/390/768/1440px without overflow; no browser errors.",
   );
+  if (process.env.SMOKE_CROSS_ORIGIN) assert.ok(crossOriginWrites > 10);
   await browser.close();
 })().catch((error) => {
   console.error(error);

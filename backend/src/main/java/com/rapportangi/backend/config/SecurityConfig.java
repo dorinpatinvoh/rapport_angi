@@ -16,6 +16,31 @@ import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 public class SecurityConfig {
 
   @Bean
+  org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource(
+    @org.springframework.beans.factory.annotation.Value(
+      "${app.allowed-origins:${app.public-url:http://localhost:4200}}"
+    ) String origins
+  ) {
+    var config = new org.springframework.web.cors.CorsConfiguration();
+    config.setAllowedOrigins(
+      java.util.Arrays.stream(origins.split(","))
+        .map(String::strip)
+        .filter(origin -> !origin.isEmpty())
+        .toList()
+    );
+    config.setAllowedMethods(
+      java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS")
+    );
+    config.setAllowedHeaders(java.util.List.of("Content-Type", "X-XSRF-TOKEN"));
+    config.setAllowCredentials(true);
+    config.setMaxAge(3600L);
+    var source =
+      new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/api/**", config);
+    return source;
+  }
+
+  @Bean
   PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
   }
@@ -36,9 +61,10 @@ public class SecurityConfig {
     UserRepository users
   ) throws Exception {
     return http
+      .cors(org.springframework.security.config.Customizer.withDefaults())
       .addFilterAfter(
         new SessionAccountFilter(users),
-        org.springframework.security.web.context.SecurityContextHolderFilter.class
+        org.springframework.web.filter.CorsFilter.class
       )
       .csrf(csrf ->
         csrf

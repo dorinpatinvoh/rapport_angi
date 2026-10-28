@@ -17,7 +17,30 @@
             "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
             "styles": ["src/styles.scss"],
-            "assets": []
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
+            ]
+          },
+          "configurations": {
+            "lws": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.lws.ts"
+                }
+              ]
+            },
+            "cross-origin": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.cross-origin.ts"
+                }
+              ]
+            }
           }
         },
         "serve": {

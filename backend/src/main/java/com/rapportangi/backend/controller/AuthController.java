@@ -32,7 +32,11 @@ public class AuthController {
   }
 
   @GetMapping("/csrf")
-  public CsrfResponse csrf(CsrfToken csrf) {
+  public CsrfResponse csrf(
+    CsrfToken csrf,
+    jakarta.servlet.http.HttpServletResponse response
+  ) {
+    response.setHeader("Cache-Control", "no-store");
     return new CsrfResponse(csrf.getToken());
   }
 
