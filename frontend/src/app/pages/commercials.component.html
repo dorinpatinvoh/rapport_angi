@@ -2,9 +2,7 @@
   <div>
     <p class="eyebrow">Administration</p>
     <h1>Commerciaux</h1>
-    <p class="text-secondary">
-      Créez les comptes terrain et validez les demandes d'inscription.
-    </p>
+    <p class="text-secondary">Créez et activez les comptes de votre équipe.</p>
   </div>
 </div>
 @if (error()) {
@@ -67,8 +65,23 @@
       <div class="col-sm-6">
         <label for="createTeam" class="form-label">Équipe</label
         ><select id="createTeam" class="form-select" formControlName="team">
-          <option value="AZO">AZO</option>
-          <option value="ZEHAMI">Zehami</option>
+          @for (project of projects(); track project) {
+            <option [value]="project">{{ project }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-sm-6">
+        <label for="createCountry" class="form-label">Pays du commercial</label>
+        <select
+          id="createCountry"
+          class="form-select"
+          formControlName="country"
+        >
+          @for (c of countries(); track c.code) {
+            @if (auth.isSuperAdmin() || c.code === auth.user()?.country) {
+              <option [value]="c.code">{{ c.name }}</option>
+            }
+          }
         </select>
       </div>
       <div class="col-sm-6">

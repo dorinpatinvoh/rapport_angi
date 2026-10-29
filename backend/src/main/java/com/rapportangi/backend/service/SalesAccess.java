@@ -45,13 +45,36 @@ public class SalesAccess {
     );
   }
 
+  public static boolean scope(User actor, String country, String project) {
+    if (has(actor, "SUPER_ADMIN")) return true;
+    if (has(actor, "DIRECTEUR_COMMERCIAL")) return (
+      actor.getDirectorCountry() != null &&
+      java.util.Objects.equals(actor.getDirectorCountry(), country) &&
+      (project == null || actor.getProjects().contains(project))
+    );
+    return (
+      java.util.Objects.equals(actor.getCountry(), country) &&
+      (project == null || java.util.Objects.equals(actor.getTeam(), project))
+    );
+  }
+
+  public static boolean manages(User actor, User target) {
+    return (
+      has(actor, "SUPER_ADMIN") ||
+      (has(actor, "DIRECTEUR_COMMERCIAL") &&
+        !director(target) &&
+        !has(target, "ADMIN") &&
+        scope(actor, target.getCountry(), target.getTeam()))
+    );
+  }
+
   public static boolean reads(User u, Report r) {
     if (r.getAuthor().getId().equals(u.getId())) return true;
     if ("DRAFT".equals(r.getStatus())) return (
       has(u, "SUPER_ADMIN") || has(u, "ADMIN")
     );
     return (
-      director(u) ||
+      (director(u) && scope(u, r.getCountry(), r.getTeam())) ||
       has(u, "ADMIN") ||
       (has(u, "SUPERVISEUR") &&
         r.getSupervisor() != null &&

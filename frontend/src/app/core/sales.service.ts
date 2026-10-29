@@ -9,6 +9,10 @@ export interface Member {
   supervisorId: number | null;
   zone: string | null;
   enabled: boolean;
+  country: string;
+  projects: string[];
+  zoneLevel: string | null;
+  configured: boolean;
 }
 export interface Goal {
   code: string;
@@ -60,6 +64,17 @@ export function localDay() {
 @Injectable({ providedIn: "root" })
 export class SalesService {
   private http = inject(HttpClient);
+  countries() {
+    return this.http.get<{ code: string; name: string }[]>(
+      "/api/sales/countries",
+    );
+  }
+  addCountry(code: string, name: string) {
+    return this.http.post<{ code: string; name: string }>(
+      "/api/sales/countries",
+      { code, name },
+    );
+  }
   members() {
     return this.http.get<Member[]>("/api/sales/members");
   }
@@ -70,9 +85,12 @@ export class SalesService {
       email: string;
       password: string;
       team: string;
+      country: string;
     };
     role: string;
     zone: string;
+    projects: string[];
+    zoneLevel: string;
   }) {
     return this.http.post<Member>("/api/sales/members", data);
   }
@@ -83,6 +101,9 @@ export class SalesService {
       team: string;
       supervisorId: number | null;
       zone: string;
+      country: string;
+      projects: string[];
+      zoneLevel: string;
     },
   ) {
     return this.http.put<Member>(`/api/sales/members/${id}`, data);

@@ -41,6 +41,55 @@ public class User {
   )
   private Set<Role> roles = new HashSet<>();
 
+  @Column(name = "country_code", nullable = false, length = 2)
+  private String country = "BJ";
+
+  @Column(name = "director_country", length = 2, unique = true)
+  private String directorCountry;
+
+  @Column(name = "zone_level", length = 20)
+  private String zoneLevel;
+
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(
+    name = "director_projects",
+    joinColumns = @JoinColumn(name = "user_id")
+  )
+  @Column(name = "project_code", length = 20)
+  private Set<String> projects = new HashSet<>();
+
+  public String getCountry() {
+    return country;
+  }
+
+  public void setCountry(String value) {
+    country = value;
+  }
+
+  public String getDirectorCountry() {
+    return directorCountry;
+  }
+
+  public void setDirectorCountry(String value) {
+    directorCountry = value;
+  }
+
+  public String getZoneLevel() {
+    return zoneLevel;
+  }
+
+  public void setZoneLevel(String value) {
+    zoneLevel = value;
+  }
+
+  public Set<String> getProjects() {
+    return projects;
+  }
+
+  public void setProjects(Set<String> values) {
+    projects = new HashSet<>(values);
+  }
+
   // Getters et Setters
   public Long getId() {
     return id;

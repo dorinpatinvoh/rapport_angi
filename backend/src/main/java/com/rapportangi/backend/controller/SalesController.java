@@ -26,7 +26,10 @@ public class SalesController {
   public record CreateMember(
     @Valid @NotNull com.rapportangi.backend.dto.CommercialRequest account,
     @NotNull @Pattern(regexp = "DIRECTEUR_COMMERCIAL|SUPERVISEUR") String role,
-    @Size(max = 150) String zone
+    @Size(max = 150) String zone,
+    @Size(max = 2)
+    java.util.Set<@NotNull @Pattern(regexp = "AZO|ZEHAMI") String> projects,
+    @Pattern(regexp = "DEPARTMENT|COMMUNE") String zoneLevel
   ) {}
 
   @PostMapping("/members")
@@ -38,7 +41,14 @@ public class SalesController {
     @Valid @RequestBody CreateMember r,
     Authentication a
   ) {
-    return sales.create(r.account(), r.role(), r.zone(), a);
+    return sales.create(
+      r.account(),
+      r.role(),
+      r.zone(),
+      r.projects(),
+      r.zoneLevel(),
+      a
+    );
   }
 
   public record Assignment(
@@ -47,7 +57,11 @@ public class SalesController {
     String role,
     @NotNull @Pattern(regexp = "AZO|ZEHAMI") String team,
     Long supervisorId,
-    @Size(max = 150) String zone
+    @Size(max = 150) String zone,
+    @Pattern(regexp = "[A-Z]{2}") String country,
+    @Size(max = 2)
+    java.util.Set<@NotNull @Pattern(regexp = "AZO|ZEHAMI") String> projects,
+    @Pattern(regexp = "DEPARTMENT|COMMUNE") String zoneLevel
   ) {}
 
   @PutMapping("/members/{id}")
@@ -56,7 +70,39 @@ public class SalesController {
     @Valid @RequestBody Assignment r,
     Authentication a
   ) {
-    return sales.assign(id, r.role(), r.team(), r.supervisorId(), r.zone(), a);
+    return sales.assign(
+      id,
+      r.role(),
+      r.team(),
+      r.supervisorId(),
+      r.zone(),
+      r.country(),
+      r.projects(),
+      r.zoneLevel(),
+      a
+    );
+  }
+
+  @GetMapping("/countries")
+  public List<com.rapportangi.backend.entity.SalesCountry> countries() {
+    return sales.countries();
+  }
+
+  public record Country(
+    @NotBlank @Pattern(regexp = "[A-Z]{2}") String code,
+    @NotBlank @Size(max = 100) String name
+  ) {}
+
+  @PostMapping("/countries")
+  @org.springframework.security.access.prepost.PreAuthorize(
+    "hasRole('SUPER_ADMIN')"
+  )
+  @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+  public com.rapportangi.backend.entity.SalesCountry addCountry(
+    @Valid @RequestBody Country c,
+    Authentication a
+  ) {
+    return sales.addCountry(c.code(), c.name(), a);
   }
 
   @GetMapping("/goals")

@@ -24,6 +24,8 @@ public class PasswordResetService {
   private final PasswordEncoder encoder;
   private final ObjectProvider<JavaMailSender> sender;
   private final String host, from, publicUrl;
+  private final SalesAccess access;
+  private final CommunicationService comms;
   private final Map<String, Instant> cooldown = new LinkedHashMap<>();
 
   public PasswordResetService(
@@ -33,9 +35,13 @@ public class PasswordResetService {
     ObjectProvider<JavaMailSender> sender,
     @Value("${spring.mail.host:}") String host,
     @Value("${app.mail.from:}") String from,
-    @Value("${app.public-url:http://localhost:4200}") String publicUrl
+    @Value("${app.public-url:http://localhost:4200}") String publicUrl,
+    SalesAccess access,
+    CommunicationService comms
   ) {
     this.users = users;
+    this.access = access;
+    this.comms = comms;
     this.tokens = tokens;
     this.encoder = encoder;
     this.sender = sender;
@@ -114,6 +120,32 @@ public class PasswordResetService {
     );
     change(user, password);
     tokens.deleteByUserId(user.getId());
+  }
+
+  @Transactional
+  public void resetCommercial(
+    Long id,
+    String password,
+    org.springframework.security.core.Authentication auth
+  ) {
+    var actor = access.current(auth);
+    if (!SalesAccess.has(actor, "SUPER_ADMIN")) throw SalesAccess.error(
+      HttpStatus.FORBIDDEN,
+      "Administration globale requise."
+    );
+    resetCommercial(id, password);
+    var target = users.findById(id).orElseThrow();
+    comms.record(
+      actor,
+      "PASSWORD_RESET",
+      "Accès au compte de " +
+        target.getFirstName() +
+        " " +
+        target.getLastName() +
+        " réinitialisé.",
+      target.getCountry(),
+      target.getTeam()
+    );
   }
 
   @Transactional

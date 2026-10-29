@@ -3,11 +3,14 @@ import { DashboardComponent } from "./pages/dashboard.component";
 import { ReportsComponent } from "./pages/reports.component";
 import { LoginComponent } from "./pages/login.component";
 import { CommercialsComponent } from "./pages/commercials.component";
-import { RegisterComponent } from "./pages/register.component";
 import { authGuard, directorGuard, managementGuard } from "./core/auth.guard";
 import { PasswordResetComponent } from "./pages/password-reset.component";
 import { OrganizationComponent } from "./pages/organization.component";
 import { SummariesComponent } from "./pages/summaries.component";
+import {
+  CommunicationsComponent,
+  NotificationsComponent,
+} from "./pages/communications.component";
 export const routes: Routes = [
   { path: "", redirectTo: "dashboard", pathMatch: "full" },
   {
@@ -26,7 +29,17 @@ export const routes: Routes = [
     component: SummariesComponent,
     canActivate: [managementGuard],
   },
-  { path: "inscription", component: RegisterComponent },
+  { path: "inscription", redirectTo: "connexion", pathMatch: "full" },
+  {
+    path: "communiques",
+    component: CommunicationsComponent,
+    canActivate: [authGuard],
+  },
+  {
+    path: "notifications",
+    component: NotificationsComponent,
+    canActivate: [authGuard],
+  },
   {
     path: "commerciaux",
     component: CommercialsComponent,

@@ -38,9 +38,10 @@ public class PasswordResetController {
   @PreAuthorize("hasRole('SUPER_ADMIN')")
   public Map<String, String> commercial(
     @PathVariable Long id,
-    @Valid @RequestBody PasswordRequest request
+    @Valid @RequestBody PasswordRequest request,
+    org.springframework.security.core.Authentication a
   ) {
-    reset.resetCommercial(id, request.password());
+    reset.resetCommercial(id, request.password(), a);
     return Map.of(
       "message",
       "Mot de passe du commercial réinitialisé. Ses sessions précédentes sont invalidées."

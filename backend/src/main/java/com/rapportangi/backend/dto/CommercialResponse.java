@@ -9,7 +9,8 @@ public record CommercialResponse(
   String email,
   String team,
   String referralCode,
-  boolean enabled
+  boolean enabled,
+  String country
 ) {
   public static CommercialResponse from(User u) {
     return new CommercialResponse(
@@ -19,7 +20,8 @@ public record CommercialResponse(
       u.getEmail(),
       u.getTeam(),
       u.getReferralCode(),
-      u.isEnabled()
+      u.isEnabled(),
+      u.getCountry()
     );
   }
 }

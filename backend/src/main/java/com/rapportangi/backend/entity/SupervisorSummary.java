@@ -13,6 +13,21 @@ import java.util.*;
 )
 public class SupervisorSummary {
 
+  @jakarta.persistence.Column(
+    name = "country_code",
+    nullable = false,
+    length = 2
+  )
+  private String country = "BJ";
+
+  public String getCountry() {
+    return country;
+  }
+
+  public void setCountry(String value) {
+    country = value;
+  }
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   public Long id;

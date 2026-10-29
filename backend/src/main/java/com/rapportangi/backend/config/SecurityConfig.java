@@ -73,10 +73,13 @@ public class SecurityConfig {
       )
       .authorizeHttpRequests(auth ->
         auth
+          .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ASYNC)
+          .permitAll()
+          .requestMatchers("/api/auth/register", "/api/auth/register/**")
+          .denyAll()
           .requestMatchers(
             "/api/auth/csrf",
             "/api/auth/login",
-            "/api/auth/register",
             "/api/auth/forgot-password",
             "/api/auth/reset-password",
             "/api/branding/**",

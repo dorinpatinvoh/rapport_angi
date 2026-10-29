@@ -21,28 +21,33 @@ public class CommercialController {
   }
 
   @GetMapping
-  public List<CommercialResponse> list() {
-    return accounts.list();
+  public List<CommercialResponse> list(
+    org.springframework.security.core.Authentication a
+  ) {
+    return accounts.list(a);
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public CommercialResponse create(
-    @Valid @RequestBody CommercialRequest request
+    @Valid @RequestBody CommercialRequest request,
+    org.springframework.security.core.Authentication a
   ) {
-    return accounts.create(request, true);
+    return accounts.createAuthorized(request, a);
   }
 
   @PutMapping("/{id}")
   public CommercialResponse update(
     @PathVariable Long id,
-    @Valid @RequestBody Update request
+    @Valid @RequestBody Update request,
+    org.springframework.security.core.Authentication a
   ) {
-    return accounts.update(
+    return accounts.updateAuthorized(
       id,
       request.team(),
       request.referralCode(),
-      request.enabled()
+      request.enabled(),
+      a
     );
   }
 

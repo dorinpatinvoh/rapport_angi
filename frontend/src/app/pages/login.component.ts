@@ -7,7 +7,8 @@ import { AuthService } from "../core/auth.service";
   selector: "app-login",
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink],
-  template: ` <div class="panel mx-auto" style="max-width:460px">
+  template: ` <div class="panel auth-panel">
+    <p class="eyebrow">Votre espace de travail</p>
     <h1 class="h3 fw-bold mb-3">Connexion</h1>
     <p class="text-secondary">Accédez à votre espace ANGI DSN PRO.</p>
     <form [formGroup]="form" (ngSubmit)="submit()">
@@ -43,8 +44,8 @@ import { AuthService } from "../core/auth.service";
       >
         {{ busy() ? "Connexion…" : "Se connecter" }}
       </button>
-      <p class="text-center mt-3 mb-0">
-        Nouveau commercial ? <a routerLink="/inscription">Créer mon compte</a>
+      <p class="text-center mt-3 mb-0 small text-secondary">
+        Votre compte est créé par votre directeur ou votre administrateur.
       </p>
       <a routerLink="/mot-de-passe-oublie" class="d-block text-center mt-3"
         >Mot de passe oublié ?</a

@@ -64,6 +64,7 @@ public class ReportService {
     );
     var report = new Report();
     report.setAuthor(user);
+    report.setCountry(user.getCountry());
     String team =
       user.getTeam() != null
         ? user.getTeam()
@@ -295,6 +296,7 @@ public class ReportService {
           !supervisor.isEnabled() ||
           !SalesAccess.has(supervisor, "SUPERVISEUR") ||
           !java.util.Objects.equals(supervisor.getTeam(), r.getTeam()) ||
+          !java.util.Objects.equals(supervisor.getCountry(), r.getCountry()) ||
           supervisor.getZone() == null ||
           supervisor.getZone().isBlank())
       ) throw error(

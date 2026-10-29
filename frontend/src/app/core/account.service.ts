@@ -8,6 +8,7 @@ export interface Commercial {
   team: string;
   referralCode: string | null;
   enabled: boolean;
+  country: string;
 }
 export interface AccountInput {
   firstName: string;
@@ -16,13 +17,11 @@ export interface AccountInput {
   password: string;
   team: string;
   referralCode?: string;
+  country?: string;
 }
 @Injectable({ providedIn: "root" })
 export class AccountService {
   private http = inject(HttpClient);
-  register(data: AccountInput) {
-    return this.http.post<{ message: string }>("/api/auth/register", data);
-  }
   list() {
     return this.http.get<Commercial[]>("/api/commercials");
   }

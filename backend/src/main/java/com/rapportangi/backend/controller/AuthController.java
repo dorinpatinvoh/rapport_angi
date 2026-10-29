@@ -16,21 +16,6 @@ public class AuthController {
     this.users = users;
   }
 
-  @org.springframework.beans.factory.annotation.Autowired
-  private com.rapportangi.backend.service.AccountService accounts;
-
-  @PostMapping("/register")
-  @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
-  public java.util.Map<String, String> register(
-    @jakarta.validation.Valid @RequestBody com.rapportangi.backend.dto.CommercialRequest request
-  ) {
-    accounts.create(request, false);
-    return java.util.Map.of(
-      "message",
-      "Inscription reçue. Votre compte doit être activé par le super administrateur."
-    );
-  }
-
   @GetMapping("/csrf")
   public CsrfResponse csrf(
     CsrfToken csrf,
@@ -60,7 +45,9 @@ public class AuthController {
         .map(a -> a.getAuthority())
         .toList(),
       user.getTeam(),
-      user.getReferralCode()
+      user.getReferralCode(),
+      user.getCountry(),
+      new java.util.TreeSet<>(user.getProjects())
     );
   }
 
@@ -72,6 +59,8 @@ public class AuthController {
     String email,
     List<String> roles,
     String team,
-    String referralCode
+    String referralCode,
+    String country,
+    java.util.Set<String> projects
   ) {}
 }

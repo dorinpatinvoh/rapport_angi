@@ -1,4 +1,4 @@
-import { Component, inject, signal } from "@angular/core";
+import { Component, inject, signal, computed } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { finalize, switchMap } from "rxjs";
@@ -11,16 +11,17 @@ import { apiError } from "../core/report.service";
   template: `
     <div class="page-heading">
       <div>
-        <p class="eyebrow">Direction commerciale</p>
+        <p class="eyebrow">Les bonnes personnes, au bon endroit</p>
         <h1>Organisation et zones</h1>
         <p class="text-secondary">
-          Chaque commercial dépend d'un superviseur de la même équipe. Le
-          superviseur porte la zone.
+          Un directeur par pays. Des projets et des équipes clairement
+          rattachés.
         </p>
       </div>
       @if (auth.isDirector()) {
         <a routerLink="/commerciaux" class="btn btn-primary"
-          >Créer / activer un compte</a
+          ><i class="bi bi-person-plus" aria-hidden="true"></i>Créer / activer
+          un compte</a
         >
       }
     </div>
@@ -30,12 +31,39 @@ import { apiError } from "../core/report.service";
     @if (success()) {
       <div role="status" class="alert alert-success">{{ success() }}</div>
     }
+    @if (members().some(unconfigured)) {
+      <p class="alert alert-warning">
+        Un directeur doit encore recevoir son pays et ses projets. Le super
+        administrateur peut le configurer avec Affecter / nommer.
+      </p>
+    }
+    <div class="overview-strip">
+      <div>
+        <strong>{{ members().length }}</strong
+        ><span>Comptes accessibles</span>
+      </div>
+      <div>
+        <strong>{{ count("DIRECTEUR_COMMERCIAL") }}</strong
+        ><span>Direction</span>
+      </div>
+      <div>
+        <strong>{{ count("SUPERVISEUR") }}</strong
+        ><span>Supervision</span>
+      </div>
+      <div>
+        <strong>{{ count("COMMERCIAL") }}</strong
+        ><span>Commerciaux</span>
+      </div>
+    </div>
     @if (auth.isDirector()) {
-      <details class="panel mb-4">
-        <summary class="fw-semibold">Créer un responsable</summary>
+      <details class="panel mb-4 manager-create">
+        <summary class="fw-semibold">
+          <i class="bi bi-person-badge" aria-hidden="true"></i>Créer un
+          responsable
+        </summary>
         <p class="text-secondary mt-3">
-          Le compte sera actif immédiatement. Pour créer un commercial, utilisez
-          la page Commerciaux.
+          Le compte sera actif immédiatement. Un directeur peut suivre plusieurs
+          projets de son pays.
         </p>
         <form (ngSubmit)="createManager()" #createForm="ngForm">
           <div class="row g-3">
@@ -116,20 +144,66 @@ import { apiError } from "../core/report.service";
               </select>
             </div>
             <div class="col-sm-6">
-              <label for="managerTeam" class="form-label"
-                >Équipe du responsable</label
+              <label for="managerCountry" class="form-label"
+                >Pays du responsable</label
               ><select
-                id="managerTeam"
-                name="managerTeam"
-                [(ngModel)]="newAccount.team"
+                id="managerCountry"
+                name="managerCountry"
+                [(ngModel)]="newAccount.country"
                 class="form-select"
                 required
               >
-                <option value="AZO">AZO</option>
-                <option value="ZEHAMI">Zehami</option>
+                @for (c of availableCountries(); track c.code) {
+                  <option [value]="c.code">{{ c.name }}</option>
+                }
               </select>
             </div>
-            @if (newRole === "SUPERVISEUR") {
+            @if (newRole === "DIRECTEUR_COMMERCIAL") {
+              <fieldset class="col-12">
+                <legend class="form-label">Projets du directeur</legend>
+                @for (p of allProjects; track p) {
+                  <label class="check-chip"
+                    ><input
+                      type="checkbox"
+                      [checked]="newProjects.includes(p)"
+                      (change)="toggleNew(p)"
+                    />{{ p }}</label
+                  >
+                }
+                <p class="form-text">
+                  Un seul directeur par pays, même s’il gère plusieurs projets.
+                </p>
+              </fieldset>
+            } @else {
+              <div class="col-sm-6">
+                <label for="managerTeam" class="form-label"
+                  >Équipe du responsable</label
+                ><select
+                  id="managerTeam"
+                  name="managerTeam"
+                  [(ngModel)]="newAccount.team"
+                  class="form-select"
+                  required
+                >
+                  @for (p of allowedProjects(); track p) {
+                    <option [value]="p">{{ p }}</option>
+                  }
+                </select>
+              </div>
+              <div class="col-sm-6">
+                <label for="managerLevel" class="form-label"
+                  >Niveau de la nouvelle zone</label
+                ><select
+                  id="managerLevel"
+                  name="managerLevel"
+                  [(ngModel)]="newLevel"
+                  class="form-select"
+                  required
+                >
+                  <option value="DEPARTMENT">Département</option>
+                  <option value="COMMUNE">Commune</option>
+                </select>
+              </div>
               <div class="col-12">
                 <label for="managerZone" class="form-label"
                   >Zone du nouveau superviseur</label
@@ -141,39 +215,143 @@ import { apiError } from "../core/report.service";
                   required
                   pattern=".*\\S.*"
                   maxlength="150"
+                  placeholder="Nom du département ou de la commune"
                 />
               </div>
             }
           </div>
           <button
             class="btn btn-primary mt-3"
-            [disabled]="createForm.invalid || busy()"
+            [disabled]="
+              createForm.invalid ||
+              busy() ||
+              (newRole === 'DIRECTEUR_COMMERCIAL' && !newProjects.length)
+            "
           >
-            Créer le responsable
+            {{ busy() ? "Enregistrement…" : "Créer le responsable" }}
           </button>
         </form>
       </details>
+      @if (auth.isSuperAdmin()) {
+        <details class="panel mb-4">
+          <summary class="fw-semibold">Ajouter un pays</summary>
+          <form
+            class="row g-3 mt-1"
+            #countryForm="ngForm"
+            (ngSubmit)="addCountry()"
+          >
+            <div class="col-sm-3">
+              <label for="countryCode" class="form-label">Code pays ISO</label
+              ><input
+                id="countryCode"
+                name="countryCode"
+                [(ngModel)]="countryCode"
+                (ngModelChange)="countryCode = $event.toUpperCase()"
+                required
+                pattern="[A-Z]{2}"
+                maxlength="2"
+                class="form-control"
+                placeholder="Ex. NE"
+              />
+            </div>
+            <div class="col-sm-6">
+              <label for="countryName" class="form-label">Nom du pays</label
+              ><input
+                id="countryName"
+                name="countryName"
+                [(ngModel)]="countryName"
+                required
+                maxlength="100"
+                class="form-control"
+              />
+            </div>
+            <div class="col-sm-3 align-self-end">
+              <button
+                class="btn btn-outline-primary"
+                [disabled]="countryForm.invalid || busy()"
+              >
+                Ajouter le pays
+              </button>
+            </div>
+          </form>
+        </details>
+      }
     }
+    <div class="filter-bar">
+      <div class="search-field">
+        <i class="bi bi-search" aria-hidden="true"></i
+        ><input
+          aria-label="Rechercher un membre"
+          [(ngModel)]="query"
+          placeholder="Rechercher un nom ou un email"
+        />
+      </div>
+      <select
+        aria-label="Filtrer par rôle"
+        class="form-select"
+        [(ngModel)]="roleFilter"
+      >
+        <option value="">Tous les rôles</option>
+        <option value="COMMERCIAL">Commerciaux</option>
+        <option value="SUPERVISEUR">Superviseurs</option>
+        <option value="DIRECTEUR_COMMERCIAL">Directeurs</option>
+      </select>
+      @if (auth.isSuperAdmin()) {
+        <select
+          aria-label="Filtrer par pays"
+          class="form-select"
+          [(ngModel)]="countryFilter"
+        >
+          <option value="">Tous les pays</option>
+          @for (c of countries(); track c.code) {
+            <option [value]="c.code">{{ c.name }}</option>
+          }
+        </select>
+      }
+    </div>
     @if (loading()) {
       <p role="status">Chargement…</p>
     }
     <div class="report-grid">
-      @for (m of members(); track m.id) {
-        <article class="panel">
+      @for (m of filtered(); track m.id) {
+        <article class="panel member-card">
+          <div class="member-avatar">{{ m.name.slice(0, 1) }}</div>
           <h2 class="h5">{{ m.name }}</h2>
-          <p class="text-break">{{ m.email }}</p>
+          <p class="text-break text-secondary small">{{ m.email }}</p>
           <p>
-            <strong>{{ roleLabel(m.role) }}</strong> ·
-            {{ m.team || "Équipe à affecter" }} ·
-            {{ m.enabled ? "Actif" : "En attente" }}
+            <span class="team-pill">{{ roleLabel(m.role) }}</span>
+            <span class="small" [class.text-success]="m.enabled">{{
+              m.enabled ? "Actif" : "En attente"
+            }}</span>
           </p>
-          <p>Zone : {{ m.zone || "Non affectée" }}</p>
+          <p class="small text-secondary mb-2">
+            {{ countryLabel(m.country) }} ·
+            {{
+              m.role === "DIRECTEUR_COMMERCIAL"
+                ? m.projects.join(" / ")
+                : m.team || "Projet à affecter"
+            }}
+          </p>
+          @if (m.role === "SUPERVISEUR") {
+            <p class="small">
+              {{
+                m.zoneLevel === "DEPARTMENT"
+                  ? "Département"
+                  : m.zoneLevel === "COMMUNE"
+                    ? "Commune"
+                    : "Zone à préciser"
+              }}
+              : {{ m.zone || "Non affectée" }}
+            </p>
+          }
           @if (m.role === "COMMERCIAL") {
-            <p>Superviseur : {{ supervisorName(m.supervisorId) }}</p>
+            <p class="small">
+              Superviseur : {{ supervisorName(m.supervisorId) }}
+            </p>
           }
           @if (auth.isDirector() && editable(m)) {
             <button
-              class="btn btn-outline-primary"
+              class="btn btn-outline-primary mt-auto"
               (click)="edit(m)"
               [disabled]="busy()"
             >
@@ -181,14 +359,19 @@ import { apiError } from "../core/report.service";
             </button>
           }
         </article>
+      } @empty {
+        <div class="panel empty">
+          Aucun membre ne correspond à votre recherche.
+        </div>
       }
     </div>
     @if (selected(); as m) {
-      <section class="panel mt-4" id="assignment-form">
+      <section class="panel mt-4 assignment-panel" id="assignment-form">
+        <p class="eyebrow">Organisation de l’équipe</p>
         <h2 class="h4">Affectation de {{ m.name }}</h2>
         <form (ngSubmit)="save()" #f="ngForm">
           <div class="row g-3">
-            <div class="col-md-6">
+            <div class="col-sm-6">
               <label for="assignmentRole" class="form-label">Fonction</label
               ><select
                 id="assignmentRole"
@@ -206,21 +389,67 @@ import { apiError } from "../core/report.service";
                 }
               </select>
             </div>
-            <div class="col-md-6">
-              <label for="assignmentTeam" class="form-label">Équipe</label
+            <div class="col-sm-6">
+              <label for="assignmentCountry" class="form-label"
+                >Pays d’affectation</label
               ><select
-                id="assignmentTeam"
-                name="team"
-                [(ngModel)]="team"
+                id="assignmentCountry"
+                name="country"
+                [(ngModel)]="country"
                 (ngModelChange)="supervisorId = null"
                 class="form-select"
                 required
               >
-                <option value="AZO">AZO</option>
-                <option value="ZEHAMI">Zehami</option>
+                @for (c of availableCountries(); track c.code) {
+                  <option [value]="c.code">{{ c.name }}</option>
+                }
               </select>
             </div>
+            @if (role === "DIRECTEUR_COMMERCIAL") {
+              <fieldset class="col-12">
+                <legend class="form-label">Projets affectés</legend>
+                @for (p of allProjects; track p) {
+                  <label class="check-chip"
+                    ><input
+                      type="checkbox"
+                      [checked]="projects.includes(p)"
+                      (change)="toggleProject(p)"
+                    />{{ p }}</label
+                  >
+                }
+              </fieldset>
+            } @else {
+              <div class="col-sm-6">
+                <label for="assignmentTeam" class="form-label">Équipe</label
+                ><select
+                  id="assignmentTeam"
+                  name="team"
+                  [(ngModel)]="team"
+                  (ngModelChange)="supervisorId = null"
+                  class="form-select"
+                  required
+                >
+                  @for (p of allowedProjects(); track p) {
+                    <option [value]="p">{{ p }}</option>
+                  }
+                </select>
+              </div>
+            }
             @if (role === "SUPERVISEUR") {
+              <div class="col-sm-6">
+                <label for="assignmentLevel" class="form-label"
+                  >Niveau géographique</label
+                ><select
+                  id="assignmentLevel"
+                  name="zoneLevel"
+                  [(ngModel)]="zoneLevel"
+                  class="form-select"
+                  required
+                >
+                  <option value="DEPARTMENT">Département</option>
+                  <option value="COMMUNE">Commune</option>
+                </select>
+              </div>
               <div class="col-12">
                 <label for="assignmentZone" class="form-label"
                   >Zone du superviseur</label
@@ -228,10 +457,9 @@ import { apiError } from "../core/report.service";
                   id="assignmentZone"
                   name="zone"
                   [(ngModel)]="zone"
-                  maxlength="150"
                   required
+                  maxlength="150"
                   class="form-control"
-                  placeholder="Ex. Cotonou Nord"
                 />
               </div>
             }
@@ -257,20 +485,28 @@ import { apiError } from "../core/report.service";
               </div>
             }
           </div>
-          <p class="small text-secondary mt-3">
-            L'affectation déconnecte ce compte pour appliquer ses nouveaux
-            droits. Les rapports déjà envoyés conservent leur superviseur et
-            leur zone.
+          <p class="form-text mt-3">
+            Les nouveaux droits s’appliquent à la prochaine connexion. Les
+            rapports envoyés gardent leur périmètre historique.
           </p>
-          <button class="btn btn-primary me-2" [disabled]="f.invalid || busy()">
-            Enregistrer l'affectation</button
-          ><button
-            type="button"
-            class="btn btn-outline-secondary"
-            (click)="selected.set(null)"
-          >
-            Annuler
-          </button>
+          <div class="d-flex gap-2 flex-wrap">
+            <button
+              class="btn btn-primary"
+              [disabled]="
+                f.invalid ||
+                busy() ||
+                (role === 'DIRECTEUR_COMMERCIAL' && !projects.length)
+              "
+            >
+              Enregistrer l'affectation</button
+            ><button
+              class="btn btn-outline-secondary"
+              type="button"
+              (click)="selected.set(null)"
+            >
+              Annuler
+            </button>
+          </div>
         </form>
       </section>
     }
@@ -280,14 +516,22 @@ export class OrganizationComponent {
   readonly auth = inject(AuthService);
   private api = inject(SalesService);
   readonly members = signal<Member[]>([]);
+  readonly countries = signal<{ code: string; name: string }[]>([]);
   readonly selected = signal<Member | null>(null);
   readonly error = signal("");
   readonly success = signal("");
   readonly busy = signal(false);
   readonly loading = signal(false);
+  readonly allProjects = ["AZO", "ZEHAMI"];
+  query = "";
+  roleFilter = "";
+  countryFilter = "";
   role = "COMMERCIAL";
   team = "AZO";
   zone = "";
+  country = "BJ";
+  zoneLevel = "COMMUNE";
+  projects: string[] = [];
   supervisorId: number | null = null;
   newAccount = {
     firstName: "",
@@ -295,46 +539,33 @@ export class OrganizationComponent {
     email: "",
     password: "",
     team: "AZO",
+    country: "BJ",
   };
   newRole = "SUPERVISEUR";
   newZone = "";
-  createManager() {
-    if (this.busy()) return;
-    this.busy.set(true);
-    this.error.set("");
-    this.success.set("");
-    this.auth
-      .csrf()
-      .pipe(
-        switchMap(() =>
-          this.api.createMember({
-            account: this.newAccount,
-            role: this.newRole,
-            zone: this.newRole === "SUPERVISEUR" ? this.newZone : "",
-          }),
-        ),
-        finalize(() => this.busy.set(false)),
-      )
-      .subscribe({
-        next: (member) => {
-          this.newAccount = {
-            firstName: "",
-            lastName: "",
-            email: "",
-            password: "",
-            team: "AZO",
-          };
-          this.newZone = "";
-          this.success.set(
-            `${this.roleLabel(member.role)} créé et activé. Transmettez-lui personnellement ses identifiants.`,
-          );
-          this.load();
-        },
-        error: (e) => this.error.set(apiError(e)),
-      });
-  }
+  newLevel = "COMMUNE";
+  newProjects = ["AZO", "ZEHAMI"];
+  countryCode = "";
+  countryName = "";
+  readonly unconfigured = (m: Member) => !m.configured;
   constructor() {
+    this.newAccount.country = this.auth.user()?.country || "BJ";
+    this.newAccount.team = this.allowedProjects()[0] || "AZO";
+    this.loadCountries();
     this.load();
+  }
+  allowedProjects() {
+    return this.auth.isSuperAdmin()
+      ? this.allProjects
+      : this.auth.user()?.projects || [];
+  }
+  availableCountries() {
+    return this.countries().filter(
+      (c) => this.auth.isSuperAdmin() || c.code === this.auth.user()?.country,
+    );
+  }
+  countryLabel(code: string) {
+    return this.countries().find((c) => c.code === code)?.name || code;
   }
   roleLabel(role: string) {
     return (
@@ -348,6 +579,28 @@ export class OrganizationComponent {
         } as Record<string, string>
       )[role] || role
     );
+  }
+  count(role: string) {
+    return this.members().filter((m) => m.role === role).length;
+  }
+  filtered() {
+    const q = this.query.trim().toLowerCase();
+    return this.members().filter(
+      (m) =>
+        (!q || (m.name + " " + m.email).toLowerCase().includes(q)) &&
+        (!this.roleFilter || m.role === this.roleFilter) &&
+        (!this.countryFilter || m.country === this.countryFilter),
+    );
+  }
+  toggleNew(p: string) {
+    this.newProjects = this.newProjects.includes(p)
+      ? this.newProjects.filter((x) => x !== p)
+      : [...this.newProjects, p];
+  }
+  toggleProject(p: string) {
+    this.projects = this.projects.includes(p)
+      ? this.projects.filter((x) => x !== p)
+      : [...this.projects, p];
   }
   supervisorName(id: number | null) {
     return this.members().find((m) => m.id === id)?.name || "À affecter";
@@ -365,8 +618,15 @@ export class OrganizationComponent {
         m.role === "SUPERVISEUR" &&
         m.enabled &&
         m.team === this.team &&
+        m.country === this.country &&
         m.id !== this.selected()?.id,
     );
+  }
+  loadCountries() {
+    this.api.countries().subscribe({
+      next: (c) => this.countries.set(c),
+      error: (e) => this.error.set(apiError(e)),
+    });
   }
   load() {
     this.loading.set(true);
@@ -378,11 +638,82 @@ export class OrganizationComponent {
         error: (e) => this.error.set(apiError(e)),
       });
   }
+  createManager() {
+    if (this.busy()) return;
+    this.busy.set(true);
+    this.error.set("");
+    this.success.set("");
+    const account = {
+      ...this.newAccount,
+      team:
+        this.newRole === "DIRECTEUR_COMMERCIAL"
+          ? this.newProjects[0] || "AZO"
+          : this.newAccount.team,
+    };
+    this.auth
+      .csrf()
+      .pipe(
+        switchMap(() =>
+          this.api.createMember({
+            account,
+            role: this.newRole,
+            zone: this.newRole === "SUPERVISEUR" ? this.newZone : "",
+            projects: this.newProjects,
+            zoneLevel: this.newLevel,
+          }),
+        ),
+        finalize(() => this.busy.set(false)),
+      )
+      .subscribe({
+        next: (m) => {
+          this.newAccount = {
+            firstName: "",
+            lastName: "",
+            email: "",
+            password: "",
+            team: this.allowedProjects()[0] || "AZO",
+            country: this.auth.user()?.country || "BJ",
+          };
+          this.newZone = "";
+          this.success.set(
+            this.roleLabel(m.role) +
+              " créé et activé. Transmettez-lui personnellement ses identifiants.",
+          );
+          this.load();
+        },
+        error: (e) => this.error.set(apiError(e)),
+      });
+  }
+  addCountry() {
+    if (this.busy()) return;
+    this.busy.set(true);
+    this.error.set("");
+    this.auth
+      .csrf()
+      .pipe(
+        switchMap(() =>
+          this.api.addCountry(this.countryCode, this.countryName),
+        ),
+        finalize(() => this.busy.set(false)),
+      )
+      .subscribe({
+        next: () => {
+          this.countryCode = "";
+          this.countryName = "";
+          this.success.set("Pays ajouté.");
+          this.loadCountries();
+        },
+        error: (e) => this.error.set(apiError(e)),
+      });
+  }
   edit(m: Member) {
     this.selected.set(m);
     this.role = m.role;
-    this.team = m.team || "AZO";
+    this.team = m.team || this.allowedProjects()[0] || "AZO";
     this.zone = m.zone || "";
+    this.country = m.country;
+    this.zoneLevel = m.zoneLevel || "COMMUNE";
+    this.projects = [...m.projects];
     this.supervisorId = m.supervisorId;
     this.error.set("");
     setTimeout(() =>
@@ -403,8 +734,14 @@ export class OrganizationComponent {
         switchMap(() =>
           this.api.assign(m.id, {
             role: this.role,
-            team: this.team,
+            team:
+              this.role === "DIRECTEUR_COMMERCIAL"
+                ? this.projects[0] || "AZO"
+                : this.team,
             zone: this.zone,
+            country: this.country,
+            projects: this.projects,
+            zoneLevel: this.zoneLevel,
             supervisorId: this.role === "COMMERCIAL" ? this.supervisorId : null,
           }),
         ),

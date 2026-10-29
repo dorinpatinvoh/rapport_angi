@@ -38,7 +38,7 @@ public class ApiExceptionHandler {
     return ResponseEntity.status(409).body(
       Map.of(
         "message",
-        "Email ou code de parrainage déjà utilisé pour cette équipe."
+        "Email, code de parrainage ou directeur du pays déjà utilisé."
       )
     );
   }

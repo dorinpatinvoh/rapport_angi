@@ -37,6 +37,12 @@ class CommercialReportingTests {
   @Autowired
   PasswordEncoder passwords;
 
+  @Autowired
+  ActivityEventRepository events;
+
+  @Autowired
+  AnnouncementRepository announcements;
+
   MockMvc mvc;
 
   @BeforeEach
@@ -44,6 +50,8 @@ class CommercialReportingTests {
     mvc = MockMvcBuilders.webAppContextSetup(context)
       .apply(springSecurity())
       .build();
+    events.deleteAll();
+    announcements.deleteAll();
     reports.deleteAll();
     users.findAll().forEach(u -> {
       u.setSupervisor(null);
@@ -137,8 +145,7 @@ class CommercialReportingTests {
   }
 
   @Test
-  void publicSignupStaysPendingWithoutPrivilegeOrReferralCode()
-    throws Exception {
+  void publicSignupIsRemovedForEveryone() throws Exception {
     mvc
       .perform(
         post("/api/auth/register")
@@ -146,46 +153,17 @@ class CommercialReportingTests {
           .contentType("application/json")
           .content(signup())
       )
-      .andExpect(status().isCreated());
-    var u = users.findByEmail("alice@test.com").orElseThrow();
-    assertFalse(u.isEnabled());
-    assertNull(u.getReferralCode());
-    assertTrue(passwords.matches("long-secret-password", u.getPassword()));
-    assertEquals(
-      Set.of("COMMERCIAL"),
-      u
-        .getRoles()
-        .stream()
-        .map(Role::getName)
-        .collect(java.util.stream.Collectors.toSet())
-    );
-    mvc
-      .perform(
-        post("/api/auth/login")
-          .with(csrf())
-          .param("email", "alice@test.com")
-          .param("password", "long-secret-password")
-      )
       .andExpect(status().isUnauthorized());
     mvc
       .perform(
-        put("/api/commercials/" + u.getId())
+        post("/api/auth/register")
           .with(user("super@test.com").roles("SUPER_ADMIN"))
           .with(csrf())
           .contentType("application/json")
-          .content(
-            "{\"team\":\"ZEHAMI\",\"referralCode\":\"Z-001\",\"enabled\":true}"
-          )
+          .content(signup())
       )
-      .andExpect(status().isOk());
-    mvc
-      .perform(
-        post("/api/auth/login")
-          .with(csrf())
-          .param("email", "ALICE@test.com")
-          .param("password", "long-secret-password")
-      )
-      .andExpect(status().isNoContent());
+      .andExpect(status().isForbidden());
+    assertTrue(users.findByEmail("alice@test.com").isEmpty());
   }
 
   @Test
@@ -213,7 +191,8 @@ class CommercialReportingTests {
       .andExpect(jsonPath("$.password").doesNotExist());
     mvc
       .perform(
-        post("/api/auth/register")
+        post("/api/commercials")
+          .with(user("super@test.com").roles("SUPER_ADMIN"))
           .with(csrf())
           .contentType("application/json")
           .content(signup().replace("alice@test.com", "ALICE@test.com"))

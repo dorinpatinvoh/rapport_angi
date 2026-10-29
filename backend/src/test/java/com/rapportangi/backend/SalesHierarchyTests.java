@@ -67,6 +67,11 @@ class SalesHierarchyTests {
     u.setEmail(name + "@sales.test");
     u.setPassword(passwords.encode("sales-test-password"));
     u.setTeam(team);
+    if (role.equals("DIRECTEUR_COMMERCIAL")) {
+      u.setDirectorCountry("BJ");
+      u.setProjects(Set.of("AZO", "ZEHAMI"));
+    }
+    if (role.equals("SUPERVISEUR")) u.setZoneLevel("COMMUNE");
     u.setRoles(Set.of(roles.findByName(role).orElseThrow()));
     if (role.equals("SUPERVISEUR")) u.setZone(name + " zone");
     return users.saveAndFlush(u);
@@ -498,7 +503,7 @@ class SalesHierarchyTests {
   void rootCreatesDirectorAndDirectorCreatesSupervisorDirectly()
     throws Exception {
     String account =
-      "{\"account\":{\"firstName\":\"Nouvelle\",\"lastName\":\"Direction\",\"email\":\"new-director@sales.test\",\"password\":\"new-director-password\",\"team\":\"AZO\"},\"role\":\"DIRECTEUR_COMMERCIAL\"}";
+      "{\"account\":{\"country\":\"NG\",\"firstName\":\"Nouvelle\",\"lastName\":\"Direction\",\"email\":\"new-director@sales.test\",\"password\":\"new-director-password\",\"team\":\"AZO\"},\"role\":\"DIRECTEUR_COMMERCIAL\"}";
     mvc
       .perform(
         post("/api/sales/members")
@@ -524,7 +529,10 @@ class SalesHierarchyTests {
             account
               .replace("new-director@sales.test", "new-supervisor@sales.test")
               .replace("DIRECTEUR_COMMERCIAL", "SUPERVISEUR")
-              .replace("\"role\":", "\"zone\":\"Calavi\",\"role\":")
+              .replace(
+                "\"role\":",
+                "\"zoneLevel\":\"COMMUNE\",\"zone\":\"Calavi\",\"role\":"
+              )
           )
       )
       .andExpect(status().isCreated())

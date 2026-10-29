@@ -37,6 +37,12 @@ class ReportWorkflowTests {
   @Autowired
   PasswordEncoder passwords;
 
+  @Autowired
+  ActivityEventRepository events;
+
+  @Autowired
+  AnnouncementRepository announcements;
+
   MockMvc mvc;
   Long authorId;
 
@@ -45,6 +51,8 @@ class ReportWorkflowTests {
     mvc = MockMvcBuilders.webAppContextSetup(context)
       .apply(springSecurity())
       .build();
+    events.deleteAll();
+    announcements.deleteAll();
     reports.deleteAll();
     users.findAll().forEach(u -> {
       u.setSupervisor(null);

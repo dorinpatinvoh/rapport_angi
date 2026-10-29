@@ -57,6 +57,12 @@ class PasswordResetTests {
   @Autowired
   RecordingSender mail;
 
+  @Autowired
+  ActivityEventRepository events;
+
+  @Autowired
+  AnnouncementRepository announcements;
+
   MockMvc mvc;
   Long id;
 
@@ -67,6 +73,8 @@ class PasswordResetTests {
       .apply(springSecurity())
       .build();
     tokens.deleteAll();
+    events.deleteAll();
+    announcements.deleteAll();
     reports.deleteAll();
     users.deleteAll();
     var u = new User();
@@ -208,6 +216,13 @@ class PasswordResetTests {
 
   @Test
   void onlySuperAdminMayResetCommercialWithoutEmail() throws Exception {
+    var root = new User();
+    root.setFirstName("Super");
+    root.setLastName("Admin");
+    root.setEmail("super@example.test");
+    root.setPassword(encoder.encode("root-test-password"));
+    root.setRoles(Set.of(roles.findByName("SUPER_ADMIN").orElseThrow()));
+    users.saveAndFlush(root);
     String body = "{\"password\":\"admin-reset-password\"}";
     mvc
       .perform(

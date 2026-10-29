@@ -2,14 +2,14 @@
 
 Angular 20 + Spring Boot 4 / Java 21 : comptes commerciaux AZO et Zehami, rapports quotidiens et suivi par le super administrateur. Interface adaptée au téléphone, à la tablette et à l'ordinateur, avec les couleurs et les logos fournis par ANGI.
 
-## Comptes et inscription
+## Comptes et accès
 
 - Le premier SUPER_ADMIN se crée par variables d'environnement (voir le démarrage ci-dessous). Un compte existant n'est pas recréé.
-- Le lien **Créer mon compte** de la connexion ouvre `/inscription`. Le commercial saisit prénom, nom, email, mot de passe et équipe. Le compte reste inactif jusqu'à validation.
-- Connecté comme SUPER_ADMIN, ouvrir **Commerciaux**. Activer la demande, choisir l'équipe et renseigner si disponible le code de parrainage de l'application mobile.
+- L’auto-inscription est supprimée. `/inscription` redirige vers la connexion et `/api/auth/register` est refusé, y compris avec un ancien frontend.
+- Seuls le SUPER_ADMIN et le DIRECTEUR_COMMERCIAL créent et activent les commerciaux dans leur périmètre. Les anciens comptes inactifs peuvent toujours être activés par la direction.
 - Pour créer directement un commercial, ouvrir **Commerciaux > Créer directement un commercial**, remplir les champs et cliquer **Créer et activer le compte**. Transmettre personnellement l'email et le mot de passe initial au commercial. Aucun email automatique n'est envoyé.
 - Un code de parrainage doit être unique dans son équipe. Il doit déjà exister dans l'application AZO ou Zehami : cette application ne crée pas de comptes dans les applications mobiles.
-- Les mots de passe sont stockés avec BCrypt. Aucune inscription publique ne permet de choisir un rôle administrateur ou de s'attribuer un code de parrainage.
+- Les mots de passe sont stockés avec BCrypt. Aucun compte ne peut être créé depuis une route publique.
 
 ## Rapport sur mobile
 
@@ -17,11 +17,11 @@ Angular 20 + Spring Boot 4 / Java 21 : comptes commerciaux AZO et Zehami, rappor
 2. Choisir la journée et le mode : compte rendu écrit, ou statistiques avec observations facultatives.
 3. En mode écrit, raconter les zones visitées, les besoins, les résultats, les difficultés et les prochaines actions.
 4. En mode statistiques, saisir les prospects contactés et les inscriptions attribuées. Sans API, les chiffres sont explicitement déclaratifs. Si l'API de l'équipe est configurée, cocher l'import ; les chiffres sont récupérés de nouveau côté serveur à l'enregistrement.
-5. Enregistrer en brouillon ou soumettre au super administrateur. Après soumission, le contenu est verrouillé.
-6. Le SUPER_ADMIN ouvre **Lire le rapport**, puis confirme le rapport ou utilise **Renvoyer pour confirmation**, avec un commentaire obligatoire. Le commercial consulte le commentaire, corrige/complète et soumet à nouveau. L'historique des retours est conservé.
+5. Enregistrer en brouillon ou soumettre au superviseur affecté. Après soumission, le contenu est verrouillé.
+6. Le superviseur affecté ouvre **Lire le rapport**, puis confirme le rapport ou utilise **Renvoyer pour confirmation**, avec une rubrique et un commentaire obligatoires. Le commercial consulte le commentaire, corrige/complète et soumet à nouveau. L'historique des retours est conservé.
 7. Le bouton **PDF** télécharge un document avec le logo ANGI, celui de l'équipe, le nom du commercial, la journée, les chiffres et leur origine, les observations et le suivi. Les longues descriptions passent sur plusieurs pages.
 
-Un commercial ne voit que ses rapports. ADMIN et SUPER_ADMIN peuvent lire tous les rapports et leurs PDF ; seul SUPER_ADMIN gère les commerciaux et examine les soumissions. Seul l'auteur peut modifier son contenu ; seuls les brouillons sont supprimables. Un super administrateur ne peut pas confirmer ses propres rapports. Les conflits entre deux versions ouvertes simultanément sont refusés plutôt que d'écraser silencieusement une modification.
+Un commercial ne voit que ses rapports. Le directeur consulte les rapports soumis de son pays et de ses projets ; le superviseur consulte ceux qui lui sont affectés. Le SUPER_ADMIN conserve la vue globale. Le contrôle des anciens rapports sans superviseur reste réservé au SUPER_ADMIN. Seul l'auteur peut modifier son contenu ; seuls les brouillons sont supprimables. Un super administrateur ne peut pas confirmer ses propres rapports. Les conflits entre deux versions ouvertes simultanément sont refusés plutôt que d'écraser silencieusement une modification.
 
 ## Démarrage sous Windows PowerShell
 
@@ -118,7 +118,7 @@ L'adaptation des backends AZO/Zehami et la fourniture des clés restent à faire
 | Méthode | Route | Accès / usage |
 | --- | --- | --- |
 | GET | `/api/auth/csrf` | Cookie CSRF |
-| POST | `/api/auth/register` | Inscription commerciale en attente |
+| POST | `/api/auth/register` | Supprimé : accès refusé |
 | POST | `/api/auth/login` | Form URL encodé : `email`, `password` |
 | GET / POST | `/api/auth/me`, `/api/auth/logout` | Profil / fin de session |
 | GET / POST | `/api/commercials` | SUPER_ADMIN : liste / création activée |
@@ -141,7 +141,7 @@ npm ci
 npm run build
 ```
 
-Les tests couvrent sessions, CSRF, inscription en attente, activation, permissions, unicité des codes, transitions et conflits de version, origine des statistiques, contrat API mobile, accès et contenu des PDF et pagination. Les migrations V1/V2/V3 sont testées sur H2 en mode PostgreSQL.
+Les tests couvrent sessions, CSRF, refus de l’auto-inscription, activation par la direction, permissions, unicité des codes, transitions et conflits de version, origine des statistiques, contrat API mobile, accès et contenu des PDF et pagination. Les migrations sont testées sur H2 en mode PostgreSQL et le conteneur est démarré sur PostgreSQL en CI.
 
 Sur Linux/CI avec Java 21, un test navigateur démarre automatiquement une base H2 isolée et teste l'interface réelle :
 
@@ -153,7 +153,7 @@ npx playwright install --with-deps chromium
 npm run test:smoke
 ```
 
-Ce test crée uniquement des comptes fictifs dans une base H2 en mémoire ; il n'utilise pas votre PostgreSQL. Les ports 8080 et 4200 doivent être libres. Le parcours couvre inscription, activation, création commerciale, rapport écrit sur mobile, retour, bilan chiffré, nouvelle soumission, confirmation, PDF et déconnexion, avec vérification des largeurs 360/390/768/1440 px.
+Ce test crée uniquement des comptes fictifs dans une base H2 en mémoire ; il n'utilise pas votre PostgreSQL. Les ports 8080 et 4200 doivent être libres. Le parcours couvre refus de l’auto-inscription, création commerciale par la direction, rapport écrit sur mobile, retour, bilan chiffré, nouvelle soumission, confirmation, PDF et déconnexion, avec vérification des largeurs 360/390/768/1440 px.
 
 En déploiement, servir Angular et `/api` sous la même origine via reverse proxy, utiliser HTTPS et `SESSION_COOKIE_SECURE=true`, fournir les secrets par l'environnement. Le bundle Angular seul ne contient pas le backend. La pagination et la limitation générale des tentatives de connexion ne sont pas encore implémentées. Les demandes de lien de réinitialisation sont espacées d’au moins une minute par email sur chaque instance. Les images de marque fournies sont conservées ; la police PDF DejaVu est accompagnée de sa licence.
 
@@ -361,3 +361,34 @@ La migration Java V7 remplace l'email de l'unique SUPER_ADMIN existant par `angi
 **Récupération Render en cours :** avant le redéploiement de cette version, renseigner `BOOTSTRAP_ADMIN_EMAIL=angidsnpro@gmail.com` si la migration doit renommer l'unique SUPER_ADMIN, conserver le mot de passe choisi dans `BOOTSTRAP_ADMIN_PASSWORD` et `BOOTSTRAP_ADMIN_RESET_PASSWORD=true`. Ne pas créer un autre compte pour contourner une ambiguïté de migration. Après une connexion réussie, supprimer les trois variables ensemble puis redéployer. Le changement d'email ne définit aucun mot de passe public.
 
 Après un `git pull origin main`, reconstruire le frontend avec `npm ci` puis `npm run build:lws` et transférer à nouveau le contenu de `frontend/dist/frontend/browser/` dans le dossier LWS du sous-domaine.
+
+
+## Organisation par pays, notifications et communiqués (V8)
+
+L’application conserve sa pile **Angular 20 / Spring Boot 4 / Java 21 / PostgreSQL**. Aucun changement vers React/Vite ou Node n’est nécessaire pour les fonctionnalités demandées.
+
+- **Un directeur par pays** : le champ réservé au directeur a un index unique en base et les nominations verrouillent la ligne du pays. Un compte inactif conserve sa place : réaffecter son rôle ou son pays avant de nommer un remplaçant. Le pays utilise un code ISO à deux lettres.
+- **Plusieurs projets** : le super administrateur coche AZO et/ou ZEHAMI pour chaque directeur. Le directeur peut gérer les superviseurs et commerciaux uniquement dans ce pays et ces projets. Le super administrateur possède les mêmes fonctions sans restriction de périmètre.
+- **Zones** : sélectionner Département ou Commune, puis saisir le nom géographique. Le directeur rattache directement les commerciaux à un superviseur actif de la même combinaison pays/projet. Les changements de périmètre sont bloqués tant que les rapports concernés ne sont pas terminés.
+- **Communication** : la rubrique Communiqués est accessible à tous les comptes connectés. La direction publie dans son pays et ses projets ; le super administrateur peut choisir un pays ou tous les pays, et un ou plusieurs projets ou tous. Les utilisateurs consultent uniquement les annonces qui les concernent. Les textes sont affichés comme texte, sans HTML exécuté.
+- **Notifications** : le journal durable trace créations, affectations, changements de statut, réinitialisations commerciales par le super administrateur, ajouts de pays et publications. L’acteur et la date sont visibles. Les données sensibles et mots de passe ne sont jamais inclus. Le journal est filtré selon le pays/projet de chaque lecteur.
+- **Temps réel** : un flux SSE avec cookies transmet uniquement un signal d’actualisation après validation de la transaction. Le frontend recharge ensuite les données par les endpoints REST autorisés. Le flux expire après 25 secondes et se reconnecte ; un heartbeat est émis toutes les 15 secondes. La fermeture de session ferme le flux côté frontend. Les échecs de transaction ne génèrent pas de fausses notifications.
+
+### Migration des comptes existants
+
+Faire une sauvegarde avant déploiement. Flyway ajoute V8 sans supprimer les comptes ni les rapports. Les données existantes sont rattachées à BJ (Bénin) et les rapports conservent ensuite leur pays historique. Si un seul directeur existe, il reçoit BJ et les deux projets existants. Si plusieurs directeurs existent déjà, leur pays reste à configurer par le SUPER_ADMIN dans Organisation et zones ; ils ne reçoivent pas arbitrairement un pays et leur accès de direction reste restreint jusqu’à cette affectation. Les anciennes zones conservent leur texte ; leur niveau doit être précisé à la prochaine modification.
+
+### API et validation
+
+- GET/POST `/api/sales/countries` : catalogue des pays ; ajout réservé au SUPER_ADMIN.
+- POST `/api/sales/members` : `{account:{firstName,lastName,email,password,team,country},role,zone,zoneLevel,projects}`.
+- PUT `/api/sales/members/{id}` : `{role,team,supervisorId,zone,zoneLevel,country,projects}`. `zoneLevel` vaut `DEPARTMENT` ou `COMMUNE`. Un directeur exige au moins un projet valide.
+- GET `/api/communications/announcements` et `/notifications` : 50 derniers éléments visibles.
+- POST `/api/communications/announcements` : `{title,content,country,projects}` ; `country:null` et `projects:[]` désignent une diffusion globale autorisée uniquement au SUPER_ADMIN.
+- GET `/api/communications/stream` : SSE authentifié, sans secret dans l’URL, autorisation des données vérifiée sur chaque requête REST.
+
+Les tests couvrent les accès entre pays/projets, l’unicité du directeur jusque dans la base, les rattachements géographiques et le ciblage des annonces/notifications. Le test navigateur utilise deux sessions pour vérifier l’arrivée d’un communiqué sans rechargement et reprend le parcours complet des rapports sur mobile et ordinateur.
+
+### Mise en ligne de la nouvelle interface
+
+Le backend Render reçoit les migrations lors du déploiement de main. Pour LWS : `git pull origin main`, puis dans `frontend`, `npm ci` et `npm run build:lws`. Envoyer tout le contenu de `dist/frontend/browser/`, y compris `.htaccess`, dans `/rapports.angidsnpro.com/`. Le build LWS utilise désormais des noms de fichiers avec empreinte pour éviter l’affichage d’un ancien JavaScript après une mise à jour. Conserver les fichiers de l’ancienne version jusqu’à la fin du transfert pour les sessions déjà ouvertes, puis actualiser la page.

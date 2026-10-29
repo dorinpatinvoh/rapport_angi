@@ -21,6 +21,8 @@ public class SalesManagementService {
   private final SupervisorSummaryRepository summaries;
   private final SalesAccess access;
   private final AccountService accounts;
+  private final SalesCountryRepository countries;
+  private final CommunicationService comms;
 
   public SalesManagementService(
     UserRepository users,
@@ -28,7 +30,9 @@ public class SalesManagementService {
     ReportRepository reports,
     SupervisorSummaryRepository summaries,
     SalesAccess access,
-    AccountService accounts
+    AccountService accounts,
+    SalesCountryRepository countries,
+    CommunicationService comms
   ) {
     this.users = users;
     this.roles = roles;
@@ -36,6 +40,8 @@ public class SalesManagementService {
     this.summaries = summaries;
     this.access = access;
     this.accounts = accounts;
+    this.countries = countries;
+    this.comms = comms;
   }
 
   public record Member(
@@ -46,7 +52,11 @@ public class SalesManagementService {
     String team,
     Long supervisorId,
     String zone,
-    boolean enabled
+    boolean enabled,
+    String country,
+    Set<String> projects,
+    String zoneLevel,
+    boolean configured
   ) {}
 
   private Member member(User u) {
@@ -67,7 +77,11 @@ public class SalesManagementService {
       u.getTeam(),
       u.getSupervisor() == null ? null : u.getSupervisor().getId(),
       u.getSupervisor() == null ? u.getZone() : u.getSupervisor().getZone(),
-      u.isEnabled()
+      u.isEnabled(),
+      u.getCountry(),
+      new TreeSet<>(u.getProjects()),
+      u.getZoneLevel(),
+      !has(u, "DIRECTEUR_COMMERCIAL") || u.getDirectorCountry() != null
     );
   }
 
@@ -82,7 +96,7 @@ public class SalesManagementService {
       .stream()
       .filter(
         u ->
-          director(actor) ||
+          manages(actor, u) ||
           u.getId().equals(actor.getId()) ||
           (u.getSupervisor() != null &&
             u.getSupervisor().getId().equals(actor.getId()))
@@ -110,9 +124,55 @@ public class SalesManagementService {
         "Création de cette fonction non autorisée."
       );
     }
-    // Creation and role assignment share this transaction: a failure leaves no partial account.
-    var created = accounts.create(request, true);
-    return assign(created.id(), role, request.team(), null, zone, auth);
+    return create(request, role, zone, null, "COMMUNE", auth);
+  }
+
+  public Member create(
+    com.rapportangi.backend.dto.CommercialRequest request,
+    String role,
+    String zone,
+    Set<String> projects,
+    String zoneLevel,
+    Authentication auth
+  ) {
+    var actor = access.current(auth);
+    if (
+      !director(actor) ||
+      !(
+        "SUPERVISEUR".equals(role) ||
+        ("DIRECTEUR_COMMERCIAL".equals(role) && has(actor, "SUPER_ADMIN"))
+      )
+    ) throw error(
+      HttpStatus.FORBIDDEN,
+      "Création de cette fonction non autorisée."
+    );
+    String country =
+      request.country() == null ? actor.getCountry() : request.country();
+    if (!scope(actor, country, request.team())) throw error(
+      HttpStatus.FORBIDDEN,
+      "Compte hors de votre pays ou de vos projets."
+    );
+    var normalized = new com.rapportangi.backend.dto.CommercialRequest(
+      request.firstName(),
+      request.lastName(),
+      request.email(),
+      request.password(),
+      request.team(),
+      null,
+      country
+    );
+    var created = accounts.create(normalized, true);
+    return assign(
+      created.id(),
+      role,
+      request.team(),
+      null,
+      zone,
+      country,
+      projects,
+      zoneLevel,
+      auth
+    );
   }
 
   public Member assign(
@@ -123,6 +183,30 @@ public class SalesManagementService {
     String zone,
     Authentication auth
   ) {
+    return assign(
+      id,
+      role,
+      team,
+      supervisorId,
+      zone,
+      null,
+      null,
+      "COMMUNE",
+      auth
+    );
+  }
+
+  public Member assign(
+    Long id,
+    String role,
+    String team,
+    Long supervisorId,
+    String zone,
+    String requestedCountry,
+    Set<String> requestedProjects,
+    String requestedLevel,
+    Authentication auth
+  ) {
     var actor = access.current(auth);
     if (!director(actor)) throw error(
       HttpStatus.FORBIDDEN,
@@ -131,6 +215,14 @@ public class SalesManagementService {
     var u = users
       .findLockedById(id)
       .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Compte introuvable"));
+    String country =
+      requestedCountry == null ? u.getCountry() : requestedCountry;
+    String oldCountry = u.getCountry(),
+      oldTeam = u.getTeam();
+    if (!manages(actor, u) || !scope(actor, country, team)) throw error(
+      HttpStatus.FORBIDDEN,
+      "Affectation hors de votre pays ou de vos projets."
+    );
     if (
       u.getId().equals(actor.getId()) ||
       has(u, "SUPER_ADMIN") ||
@@ -154,6 +246,44 @@ public class SalesManagementService {
       HttpStatus.CONFLICT,
       "Activez d’abord ce compte dans Commerciaux avant de le nommer à une fonction d’encadrement."
     );
+    countries
+      .locked(country)
+      .orElseThrow(() -> error(HttpStatus.BAD_REQUEST, "Pays inconnu."));
+    Set<String> projects =
+      requestedProjects == null
+        ? u.getProjects().isEmpty()
+          ? Set.of(team)
+          : new HashSet<>(u.getProjects())
+        : requestedProjects;
+    if ("DIRECTEUR_COMMERCIAL".equals(role)) {
+      if (
+        projects.isEmpty() || !Set.of("AZO", "ZEHAMI").containsAll(projects)
+      ) throw error(
+        HttpStatus.BAD_REQUEST,
+        "Sélectionnez au moins un projet valide."
+      );
+      if (
+        users
+          .findAll()
+          .stream()
+          .anyMatch(
+            other ->
+              !other.getId().equals(id) &&
+              country.equals(other.getDirectorCountry())
+          )
+      ) throw error(
+        HttpStatus.CONFLICT,
+        "Un directeur est déjà nommé pour ce pays. Réaffectez-le d'abord."
+      );
+    }
+    String level = requestedLevel == null ? u.getZoneLevel() : requestedLevel;
+    if (
+      "SUPERVISEUR".equals(role) &&
+      !List.of("DEPARTMENT", "COMMUNE").contains(level == null ? "" : level)
+    ) throw error(
+      HttpStatus.BAD_REQUEST,
+      "Précisez Département ou Commune pour la zone."
+    );
     var dependents = users
       .findAll()
       .stream()
@@ -170,7 +300,9 @@ public class SalesManagementService {
     );
     if (
       !dependents.isEmpty() &&
-      (!"SUPERVISEUR".equals(role) || !Objects.equals(team, u.getTeam()))
+      (!"SUPERVISEUR".equals(role) ||
+        !Objects.equals(team, u.getTeam()) ||
+        !Objects.equals(country, u.getCountry()))
     ) throw error(
       HttpStatus.CONFLICT,
       "Réaffectez d'abord les commerciaux de ce superviseur."
@@ -187,6 +319,7 @@ public class SalesManagementService {
         !has(supervisor, "SUPERVISEUR") ||
         !supervisor.isEnabled() ||
         !Objects.equals(team, supervisor.getTeam()) ||
+        !Objects.equals(country, supervisor.getCountry()) ||
         supervisor.getZone() == null ||
         supervisor.getZone().isBlank()
       ) throw error(
@@ -209,7 +342,9 @@ public class SalesManagementService {
       has(u, "SUPERVISEUR") &&
       (!"SUPERVISEUR".equals(role) ||
         !Objects.equals(team, u.getTeam()) ||
-        !Objects.equals(cleanZone, u.getZone()));
+        !Objects.equals(cleanZone, u.getZone()) ||
+        !Objects.equals(level, u.getZoneLevel()) ||
+        !Objects.equals(country, u.getCountry()));
     if (changesSupervisor) {
       var included = summaries
         .findAll()
@@ -233,12 +368,93 @@ public class SalesManagementService {
         "Transmettez d'abord les synthèses des rapports de ce superviseur avant de changer sa fonction, son équipe ou sa zone."
       );
     }
+    if (
+      commercial(u) &&
+      (!Objects.equals(country, u.getCountry()) ||
+        !Objects.equals(team, u.getTeam())) &&
+      reports
+        .findByAuthorIdOrderByCreatedAtDesc(id)
+        .stream()
+        .anyMatch(r -> !"CONFIRMED".equals(r.getStatus()))
+    ) throw error(
+      HttpStatus.CONFLICT,
+      "Terminez les rapports en cours avant de changer le pays ou le projet."
+    );
+    u.setCountry(country);
+    u.setDirectorCountry("DIRECTEUR_COMMERCIAL".equals(role) ? country : null);
+    u.setProjects("DIRECTEUR_COMMERCIAL".equals(role) ? projects : Set.of());
+    u.setZoneLevel("SUPERVISEUR".equals(role) ? level : null);
     u.setRoles(Set.of(roles.findByName(role).orElseThrow()));
     u.setTeam(team);
     u.setSupervisor(supervisor);
     u.setZone("SUPERVISEUR".equals(role) ? cleanZone : null);
     u.setSecurityVersion(u.getSecurityVersion() + 1);
-    return member(users.saveAndFlush(u));
+    var result = member(users.saveAndFlush(u));
+    comms.record(
+      actor,
+      "ASSIGNMENT_CHANGED",
+      "Affectation de " +
+        result.name() +
+        " : " +
+        ("DIRECTEUR_COMMERCIAL".equals(role)
+          ? "Directeur commercial"
+          : "SUPERVISEUR".equals(role)
+            ? "Superviseur"
+            : "Commercial") +
+        " · " +
+        country +
+        " · " +
+        ("DIRECTEUR_COMMERCIAL".equals(role)
+          ? String.join(", ", new TreeSet<>(projects))
+          : team) +
+        (cleanZone == null || cleanZone.isEmpty() ? "" : " · " + cleanZone),
+      country,
+      "DIRECTEUR_COMMERCIAL".equals(role) ? null : team
+    );
+    if (
+      !Objects.equals(oldCountry, country) || !Objects.equals(oldTeam, team)
+    ) comms.record(
+      actor,
+      "ASSIGNMENT_CHANGED",
+      "Affectation d'un compte de cette équipe modifiée.",
+      oldCountry,
+      oldTeam
+    );
+    return result;
+  }
+
+  public List<SalesCountry> countries() {
+    return countries.findAll(org.springframework.data.domain.Sort.by("name"));
+  }
+
+  public SalesCountry addCountry(
+    String code,
+    String name,
+    Authentication auth
+  ) {
+    var actor = access.current(auth);
+    if (!has(actor, "SUPER_ADMIN")) throw error(
+      HttpStatus.FORBIDDEN,
+      "Administration globale requise."
+    );
+    if (
+      !java.util.Arrays.asList(java.util.Locale.getISOCountries()).contains(
+        code
+      )
+    ) throw error(HttpStatus.BAD_REQUEST, "Code pays ISO invalide.");
+    if (countries.existsById(code)) throw error(
+      HttpStatus.CONFLICT,
+      "Ce pays existe déjà."
+    );
+    var c = countries.saveAndFlush(new SalesCountry(code, name.strip()));
+    comms.record(
+      actor,
+      "COUNTRY_CREATED",
+      "Pays ajouté : " + c.name,
+      null,
+      null
+    );
+    return c;
   }
 
   public record Progress(
@@ -270,7 +486,7 @@ public class SalesManagementService {
       .filter(
         u ->
           u.getId().equals(actor.getId()) ||
-          director(actor) ||
+          (director(actor) && scope(actor, u.getCountry(), u.getTeam())) ||
           (has(actor, "SUPERVISEUR") &&
             u.getSupervisor() != null &&
             u.getSupervisor().getId().equals(actor.getId()))
@@ -282,6 +498,7 @@ public class SalesManagementService {
             r ->
               r.getAuthor().getId().equals(u.getId()) &&
               Objects.equals(r.getTeam(), u.getTeam()) &&
+              Objects.equals(r.getCountry(), u.getCountry()) &&
               YearMonth.from(r.getReportDate()).equals(month)
           )
           .toList();
@@ -385,7 +602,8 @@ public class SalesManagementService {
       .filter(
         s ->
           s.reportDate.equals(date) &&
-          (director(actor) || s.supervisor.getId().equals(actor.getId()))
+          ((director(actor) && scope(actor, s.getCountry(), s.team)) ||
+            s.supervisor.getId().equals(actor.getId()))
       )
       .map(this::summary)
       .toList();
@@ -426,6 +644,7 @@ public class SalesManagementService {
     );
     Long actorId = actor.getId();
     String team = actor.getTeam();
+    String actorCountry = actor.getCountry();
     var daily = reports
       .findAll()
       .stream()
@@ -450,6 +669,7 @@ public class SalesManagementService {
     );
     var s = new SupervisorSummary();
     s.supervisor = actor;
+    s.setCountry(actor.getCountry());
     s.reportDate = date;
     s.team = team;
     s.zone = actor.getZone();

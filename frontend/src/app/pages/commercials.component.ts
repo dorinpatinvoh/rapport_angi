@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { finalize, switchMap } from "rxjs";
 import { AccountService, Commercial } from "../core/account.service";
 import { AuthService } from "../core/auth.service";
+import { SalesService } from "../core/sales.service";
 import { apiError } from "../core/report.service";
 @Component({
   selector: "app-commercials",
@@ -15,6 +16,13 @@ export class CommercialsComponent {
   private fb = inject(FormBuilder);
   private accounts = inject(AccountService);
   readonly auth = inject(AuthService);
+  readonly countries = signal<{ code: string; name: string }[]>([]);
+  private sales = inject(SalesService);
+  projects() {
+    return this.auth.isSuperAdmin()
+      ? ["AZO", "ZEHAMI"]
+      : this.auth.user()?.projects || [];
+  }
   readonly users = signal<Commercial[]>([]);
   readonly busy = signal(false);
   readonly loading = signal(false);
@@ -46,9 +54,18 @@ export class CommercialsComponent {
       [Validators.required, Validators.minLength(12), Validators.maxLength(72)],
     ],
     team: ["AZO", Validators.required],
+    country: ["BJ", Validators.required],
     referralCode: ["", Validators.maxLength(100)],
   });
   constructor() {
+    this.form.patchValue({
+      country: this.auth.user()?.country || "BJ",
+      team: this.projects()[0] || "",
+    });
+    this.sales.countries().subscribe({
+      next: (c) => this.countries.set(c),
+      error: (e) => this.error.set(apiError(e)),
+    });
     this.load();
   }
   load() {
@@ -74,7 +91,10 @@ export class CommercialsComponent {
       )
       .subscribe({
         next: (r) => {
-          this.form.reset({ team: "AZO" });
+          this.form.reset({
+            team: this.projects()[0] || "",
+            country: this.auth.user()?.country || "BJ",
+          });
           this.success.set(
             `Compte de ${r.firstName} ${r.lastName} créé et activé. Transmettez-lui personnellement ses identifiants.`,
           );

@@ -7,6 +7,21 @@ import java.time.LocalDateTime;
 @Table(name = "reports")
 public class Report {
 
+  @jakarta.persistence.Column(
+    name = "country_code",
+    nullable = false,
+    length = 2
+  )
+  private String country = "BJ";
+
+  public String getCountry() {
+    return country;
+  }
+
+  public void setCountry(String value) {
+    country = value;
+  }
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;

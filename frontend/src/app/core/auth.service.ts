@@ -9,6 +9,8 @@ export interface SessionUser {
   roles: string[];
   team: string | null;
   referralCode: string | null;
+  country: string;
+  projects: string[];
 }
 @Injectable({ providedIn: "root" })
 export class AuthService {

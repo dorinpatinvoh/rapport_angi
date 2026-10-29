@@ -18,7 +18,6 @@ const assert = require("node:assert/strict");
   const errors = [],
     tag = Date.now(),
     sellerEmail = `seller-${tag}@example.test`,
-    pendingEmail = `pending-${tag}@example.test`,
     supervisorEmail = `supervisor-${tag}@example.test`,
     directorEmail = `director-${tag}@example.test`,
     password = `qa-password-${tag}`;
@@ -55,6 +54,22 @@ const assert = require("node:assert/strict");
       .click();
     await page.waitForURL("**/dashboard");
   }
+  async function openLink(page, name) {
+    const target = page.getByRole("link", { name, exact: true });
+    const menu = page.getByRole("button", { name: "Menu", exact: true });
+    if (!(await target.isVisible()) && (await menu.isVisible()))
+      await menu.click();
+    await target.click();
+  }
+  async function logoutPage(page) {
+    const button = page.getByRole("button", {
+      name: "Déconnexion",
+      exact: true,
+    });
+    if (!(await button.isVisible()))
+      await page.getByRole("button", { name: "Menu", exact: true }).click();
+    await button.click();
+  }
   async function noOverflow(page) {
     assert.equal(
       await page.evaluate(
@@ -64,23 +79,18 @@ const assert = require("node:assert/strict");
       "Horizontal overflow",
     );
   }
-  // Public registration is visible and remains pending until an administrator activates it.
-  await seller.goto(root + "/connexion");
-  await seller
-    .getByRole("link", { name: "Créer mon compte", exact: true })
-    .click();
-  await seller.getByLabel("Prénom", { exact: true }).fill("Demande");
-  await seller.getByLabel("Nom", { exact: true }).fill("Test");
-  await seller.getByLabel("Email", { exact: true }).fill(pendingEmail);
-  await seller.getByLabel("Mot de passe", { exact: true }).fill(password);
-  await seller.getByLabel("Équipe", { exact: true }).selectOption("ZEHAMI");
-  await seller
-    .getByRole("button", { name: "Demander mon inscription" })
-    .click();
-  await seller.getByRole("status").filter({ hasText: "activé" }).waitFor();
+  // Public self-registration is absent; old bookmarks redirect to login.
+  await seller.goto(root + "/inscription");
+  await seller.waitForURL("**/connexion");
+  assert.equal(
+    await seller
+      .getByRole("link", { name: "Créer mon compte", exact: true })
+      .count(),
+    0,
+  );
   await noOverflow(seller);
   await login(admin, adminEmail, adminPassword);
-  await admin.getByRole("link", { name: "Commerciaux", exact: true }).click();
+  await openLink(admin, "Commerciaux");
   await admin
     .getByText("Créer directement un commercial", { exact: true })
     .click();
@@ -99,17 +109,8 @@ const assert = require("node:assert/strict");
     .getByRole("status")
     .filter({ hasText: "créé et activé" })
     .waitFor();
-  const pendingCard = admin
-    .locator("article")
-    .filter({ hasText: pendingEmail });
-  await pendingCard
-    .getByRole("button", { name: "Activer le compte", exact: true })
-    .click();
-  await admin.getByRole("status").filter({ hasText: "mis à jour" }).waitFor();
   async function createManager(page, first, email, role) {
-    await page
-      .getByRole("link", { name: "Organisation et zones", exact: true })
-      .click();
+    await openLink(page, "Organisation et zones");
     await page.getByText("Créer un responsable", { exact: true }).click();
     await page.getByLabel("Prénom du responsable", { exact: true }).fill(first);
     await page.getByLabel("Nom du responsable", { exact: true }).fill("Test");
@@ -149,9 +150,7 @@ const assert = require("node:assert/strict");
     await noOverflow(page);
   }
   async function assign(page, email, role, supervisorId = null) {
-    await page
-      .getByRole("link", { name: "Organisation et zones", exact: true })
-      .click();
+    await openLink(page, "Organisation et zones");
     await page
       .locator("article")
       .filter({ hasText: email })
@@ -198,7 +197,7 @@ const assert = require("node:assert/strict");
     .waitFor();
   await login(supervisor, supervisorEmail, password);
   await login(seller, sellerEmail, password);
-  await seller.getByRole("link", { name: "Rapports", exact: true }).click();
+  await openLink(seller, "Rapports");
   await seller.getByRole("button", { name: "Rédiger un rapport" }).click();
   await seller.getByLabel("Titre du rapport").fill("Prospection mobile test");
   await seller
@@ -227,7 +226,7 @@ const assert = require("node:assert/strict");
     .filter({ hasText: "Rapport soumis" })
     .waitFor();
   await noOverflow(seller);
-  await supervisor.getByRole("link", { name: "Rapports", exact: true }).click();
+  await openLink(supervisor, "Rapports");
   let card = supervisor
     .locator(".report-card")
     .filter({ hasText: "Prospection mobile test" });
@@ -318,9 +317,7 @@ const assert = require("node:assert/strict");
     .getByRole("button", { name: "Lire le rapport", exact: true })
     .click();
   await expect(seller.locator("#report-detail")).toContainText("Confirmé");
-  await seller
-    .getByRole("link", { name: "Tableau de bord", exact: true })
-    .click();
+  await openLink(seller, "Tableau de bord");
   await expect(seller.locator("app-objectives")).toContainText(
     "188 à atteindre",
   );
@@ -328,9 +325,7 @@ const assert = require("node:assert/strict");
     "41 à atteindre",
   );
   await expect(seller.locator("app-objectives")).toContainText("8 à atteindre");
-  await supervisor
-    .getByRole("link", { name: "Synthèses et rapport général", exact: true })
-    .click();
+  await openLink(supervisor, "Synthèses et rapport général");
   await supervisor
     .getByLabel("Résumé de la zone et points à signaler")
     .fill(
@@ -347,9 +342,7 @@ const assert = require("node:assert/strict");
     .filter({ hasText: "Synthèse transmise" })
     .waitFor();
   await noOverflow(supervisor);
-  await director
-    .getByRole("link", { name: "Synthèses et rapport général", exact: true })
-    .click();
+  await openLink(director, "Synthèses et rapport général");
   await expect(director.locator("main")).toContainText(
     "Résultats validés à Cotonou Nord",
   );
@@ -366,7 +359,7 @@ const assert = require("node:assert/strict");
   await expect(
     director.getByRole("button", { name: "Confirmer le rapport", exact: true }),
   ).toHaveCount(0);
-  await seller.getByRole("link", { name: "Rapports", exact: true }).click();
+  await openLink(seller, "Rapports");
   await seller
     .locator(".report-card")
     .filter({ hasText: "Prospection mobile test" })
@@ -403,7 +396,7 @@ const assert = require("node:assert/strict");
       fullPage: true,
     });
   }
-  await admin.getByRole("link", { name: "Commerciaux", exact: true }).click();
+  await openLink(admin, "Commerciaux");
   const sellerCard = admin.locator("article").filter({ hasText: sellerEmail });
   await sellerCard
     .getByText("Réinitialiser le mot de passe", { exact: true })
@@ -421,9 +414,7 @@ const assert = require("node:assert/strict");
   await admin.getByRole("status").filter({ hasText: "réinitialisé" }).waitFor();
   await seller.goto(root + "/rapports");
   await seller.waitForURL("**/connexion");
-  await seller
-    .getByRole("link", { name: "Mot de passe oublié ?", exact: true })
-    .click();
+  await openLink(seller, "Mot de passe oublié ?");
   await seller.getByLabel("Email du compte", { exact: true }).fill(sellerEmail);
   await seller
     .getByRole("button", { name: "Recevoir le lien", exact: true })
@@ -433,9 +424,7 @@ const assert = require("node:assert/strict");
     .filter({ hasText: "pas encore configurée" })
     .waitFor();
   await login(seller, sellerEmail, freshPassword);
-  await seller
-    .getByRole("button", { name: "Déconnexion", exact: true })
-    .click();
+  await logoutPage(seller);
   await seller.waitForURL("**/connexion");
   await seller.goto(root + "/rapports");
   await seller.waitForURL("**/connexion");
@@ -444,9 +433,52 @@ const assert = require("node:assert/strict");
       await page.setViewportSize({ width, height: 1000 });
       await noOverflow(page);
     }
+  // A second session receives a committed official announcement without refreshing its page.
+  await openLink(supervisor, "Communiqués");
+  await supervisor
+    .getByText("Aucun communiqué pour le moment", { exact: true })
+    .waitFor();
+  await openLink(director, "Communiqués");
+  await director.getByText("Publier un communiqué", { exact: true }).click();
+  await director
+    .getByLabel("Titre du communiqué", { exact: true })
+    .fill("Réunion terrain " + tag);
+  await director
+    .getByLabel("Message officiel", { exact: true })
+    .fill("Point de coordination à 09h. Merci aux équipes.");
+  await director
+    .getByRole("button", { name: "Diffuser le communiqué", exact: true })
+    .click();
+  await director
+    .getByRole("status")
+    .filter({ hasText: "Communiqué publié" })
+    .waitFor();
+  await supervisor
+    .getByRole("heading", { name: "Réunion terrain " + tag, exact: true })
+    .waitFor({ timeout: 15000 });
+  assert.equal(
+    await supervisor
+      .getByText("Publier un communiqué", { exact: true })
+      .count(),
+    0,
+  );
+  await openLink(supervisor, "Notifications");
+  await supervisor
+    .getByText("Communiqué publié : Réunion terrain " + tag, { exact: true })
+    .waitFor();
+  await supervisor
+    .getByRole("button", { name: "Tout marquer comme lu", exact: true })
+    .click();
+  await noOverflow(supervisor);
+  await supervisor.setViewportSize({ width: 390, height: 844 });
+  await noOverflow(supervisor);
+  await supervisor.screenshot({
+    path: "/tmp/rapport-notifications-mobile.png",
+    fullPage: true,
+  });
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: direct creation of director by root and supervisor by director, supervisor zone, commercial assignment, scoped routing, precise correction, monthly goals, supervisor summary, director read-only general report, signup, activation, commercial creation, login, written report, return, stats report, resubmission, confirmation, AZO profile breakdown, named AZO registrations with add/remove/edit and persisted profiles, PDF download, admin password reset, stale session invalidation, forgot-password form, logout, 360/390/768/1440px without overflow; no browser errors.",
+    "PASS: live announcement and notification between two sessions without reload, direct creation of director by root and supervisor by director, supervisor zone, commercial assignment, scoped routing, precise correction, monthly goals, supervisor summary, director read-only general report, admin-only commercial creation, login, written report, return, stats report, resubmission, confirmation, AZO profile breakdown, named AZO registrations with add/remove/edit and persisted profiles, PDF download, admin password reset, stale session invalidation, forgot-password form, logout, 360/390/768/1440px without overflow; no browser errors.",
   );
   if (process.env.SMOKE_CROSS_ORIGIN) assert.ok(crossOriginWrites > 10);
   await browser.close();

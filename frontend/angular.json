@@ -31,7 +31,8 @@
                   "replace": "src/environments/environment.ts",
                   "with": "src/environments/environment.lws.ts"
                 }
-              ]
+              ],
+              "outputHashing": "all"
             },
             "cross-origin": {
               "fileReplacements": [

@@ -18,15 +18,24 @@ public class AccountService {
   private final UserRepository users;
   private final RoleRepository roles;
   private final PasswordEncoder encoder;
+  private final SalesAccess access;
+  private final SalesCountryRepository countries;
+  private final CommunicationService comms;
 
   public AccountService(
     UserRepository users,
     RoleRepository roles,
-    PasswordEncoder encoder
+    PasswordEncoder encoder,
+    SalesAccess access,
+    SalesCountryRepository countries,
+    CommunicationService comms
   ) {
     this.users = users;
     this.roles = roles;
     this.encoder = encoder;
+    this.access = access;
+    this.countries = countries;
+    this.comms = comms;
   }
 
   public CommercialResponse create(
@@ -51,11 +60,114 @@ public class AccountService {
     u.setLastName(request.lastName().strip());
     u.setEmail(email);
     u.setTeam(request.team());
+    String country = request.country() == null ? "BJ" : request.country();
+    if (!countries.existsById(country)) throw SalesAccess.error(
+      HttpStatus.BAD_REQUEST,
+      "Pays inconnu."
+    );
+    u.setCountry(country);
     u.setPassword(encoder.encode(request.password()));
     u.setEnabled(approved);
     u.setRoles(Set.of(roles.findByName("COMMERCIAL").orElseThrow()));
     u.setReferralCode(approved ? clean(request.referralCode()) : null);
     return CommercialResponse.from(users.saveAndFlush(u));
+  }
+
+  public CommercialResponse createAuthorized(
+    CommercialRequest request,
+    org.springframework.security.core.Authentication auth
+  ) {
+    var actor = access.current(auth);
+    String country =
+      request.country() == null ? actor.getCountry() : request.country();
+    if (
+      !SalesAccess.director(actor) ||
+      !SalesAccess.scope(actor, country, request.team())
+    ) throw SalesAccess.error(
+      HttpStatus.FORBIDDEN,
+      "Création hors de votre pays ou de vos projets."
+    );
+    var created = create(
+      new CommercialRequest(
+        request.firstName(),
+        request.lastName(),
+        request.email(),
+        request.password(),
+        request.team(),
+        request.referralCode(),
+        country
+      ),
+      true
+    );
+    comms.record(
+      actor,
+      "ACCOUNT_CREATED",
+      "Compte commercial créé : " +
+        created.firstName() +
+        " " +
+        created.lastName(),
+      country,
+      request.team()
+    );
+    return created;
+  }
+
+  public List<CommercialResponse> list(
+    org.springframework.security.core.Authentication auth
+  ) {
+    var actor = access.current(auth);
+    return users
+      .findAll()
+      .stream()
+      .filter(this::commercial)
+      .filter(u -> SalesAccess.manages(actor, u))
+      .map(CommercialResponse::from)
+      .toList();
+  }
+
+  public CommercialResponse updateAuthorized(
+    Long id,
+    String team,
+    String code,
+    boolean enabled,
+    org.springframework.security.core.Authentication auth
+  ) {
+    var actor = access.current(auth);
+    var target = users
+      .findLockedById(id)
+      .orElseThrow(() ->
+        SalesAccess.error(HttpStatus.NOT_FOUND, "Commercial introuvable")
+      );
+    if (
+      !SalesAccess.manages(actor, target) ||
+      !SalesAccess.scope(actor, target.getCountry(), team)
+    ) throw SalesAccess.error(
+      HttpStatus.FORBIDDEN,
+      "Compte hors de votre périmètre."
+    );
+    String oldTeam = target.getTeam();
+    var result = update(id, team, code, enabled);
+    comms.record(
+      actor,
+      "ACCOUNT_UPDATED",
+      "Compte commercial mis à jour : " +
+        result.firstName() +
+        " " +
+        result.lastName() +
+        " (" +
+        (enabled ? "actif" : "inactif") +
+        ")",
+      target.getCountry(),
+      team
+    );
+    if (!Objects.equals(oldTeam, team)) comms.record(
+      actor,
+      "ACCOUNT_UPDATED",
+      "Un compte a quitté ce projet.",
+      target.getCountry(),
+      oldTeam
+    );
+    return result;
   }
 
   public List<CommercialResponse> list() {
@@ -91,6 +203,9 @@ public class AccountService {
     );
     u.setTeam(team);
     u.setReferralCode(clean(referralCode));
+    if (u.isEnabled() != enabled) u.setSecurityVersion(
+      u.getSecurityVersion() + 1
+    );
     u.setEnabled(enabled);
     return CommercialResponse.from(users.saveAndFlush(u));
   }

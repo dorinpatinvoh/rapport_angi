@@ -8,5 +8,17 @@ public record CommercialRequest(
   @NotBlank @Email @Size(max = 150) String email,
   @NotNull @Size(min = 12, max = 72) String password,
   @NotNull @Pattern(regexp = "AZO|ZEHAMI") String team,
-  @Size(max = 100) String referralCode
-) {}
+  @Size(max = 100) String referralCode,
+  @Pattern(regexp = "[A-Z]{2}") String country
+) {
+  public CommercialRequest(
+    String firstName,
+    String lastName,
+    String email,
+    String password,
+    String team,
+    String referralCode
+  ) {
+    this(firstName, lastName, email, password, team, referralCode, null);
+  }
+}
