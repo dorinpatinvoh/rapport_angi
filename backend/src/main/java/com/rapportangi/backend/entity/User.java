@@ -90,6 +90,17 @@ public class User {
     projects = new HashSet<>(values);
   }
 
+  @Column(name = "zone_config_id")
+  private Long zoneConfigId;
+
+  public Long getZoneConfigId() {
+    return zoneConfigId;
+  }
+
+  public void setZoneConfigId(Long value) {
+    zoneConfigId = value;
+  }
+
   // Getters et Setters
   public Long getId() {
     return id;

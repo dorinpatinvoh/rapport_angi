@@ -22,6 +22,19 @@ public class Report {
     country = value;
   }
 
+  @ElementCollection
+  @CollectionTable(
+    name = "report_goal_labels",
+    joinColumns = @JoinColumn(name = "report_id")
+  )
+  @MapKeyColumn(name = "goal_code", length = 50)
+  @Column(name = "label", length = 120)
+  private java.util.Map<String, String> goalLabels = new java.util.TreeMap<>();
+
+  public java.util.Map<String, String> getGoalLabels() {
+    return goalLabels;
+  }
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;

@@ -19,6 +19,7 @@ export interface AzoRegistration {
 export interface Report {
   azoRegistrations: AzoRegistration[];
   goalCounts: Partial<Record<string, number>>;
+  goalLabels: Record<string, string>;
   supervisorId: number | null;
   zone: string | null;
   profileCounts: Record<string, number>;

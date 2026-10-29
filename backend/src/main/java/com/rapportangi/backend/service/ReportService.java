@@ -19,17 +19,20 @@ public class ReportService {
   private final UserRepository users;
   private final MobileStatsService mobile;
   private final SupervisorSummaryRepository summaries;
+  private final ZoneGoalsService zoneGoals;
 
   public ReportService(
     ReportRepository reports,
     UserRepository users,
     MobileStatsService mobile,
-    SupervisorSummaryRepository summaries
+    SupervisorSummaryRepository summaries,
+    ZoneGoalsService zoneGoals
   ) {
     this.reports = reports;
     this.users = users;
     this.mobile = mobile;
     this.summaries = summaries;
+    this.zoneGoals = zoneGoals;
   }
 
   public List<ReportResponseDto> getAllReports(Authentication auth) {
@@ -333,11 +336,12 @@ public class ReportService {
         "Un rapport existe déjà pour cette journée et cette équipe. Corrigez le rapport existant pour éviter un double comptage."
       );
     }
+    zoneGoals.snapshotLabels(r, user);
     r.getGoalCounts().clear();
     if (
       !request.getSyncStats() || !"STATS".equals(request.getMode())
     ) r.getGoalCounts().putAll(
-      SalesGoals.validate(request.getGoalCounts(), r.getTeam())
+      zoneGoals.validate(request.getGoalCounts(), user, r)
     );
     r.setProspectsContacted(0);
     r.setRegistrations(0);
@@ -356,7 +360,7 @@ public class ReportService {
           AzoProfiles.validate(stats.profileCounts(), r.getTeam())
         );
         r.getGoalCounts().putAll(
-          SalesGoals.validate(stats.goalCounts(), r.getTeam())
+          zoneGoals.validate(stats.goalCounts(), user, r)
         );
         r.setProspectsContacted(stats.prospectsContacted());
         r.setRegistrations(stats.registrations());
@@ -391,6 +395,7 @@ public class ReportService {
         .toList()
     );
     d.setGoalCounts(new java.util.TreeMap<>(r.getGoalCounts()));
+    d.setGoalLabels(new java.util.TreeMap<>(r.getGoalLabels()));
     d.setSupervisorId(
       r.getSupervisor() == null ? null : r.getSupervisor().getId()
     );

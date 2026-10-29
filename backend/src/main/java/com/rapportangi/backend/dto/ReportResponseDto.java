@@ -4,6 +4,16 @@ import java.time.LocalDateTime;
 
 public class ReportResponseDto {
 
+  private java.util.Map<String, String> goalLabels = new java.util.TreeMap<>();
+
+  public java.util.Map<String, String> getGoalLabels() {
+    return goalLabels;
+  }
+
+  public void setGoalLabels(java.util.Map<String, String> values) {
+    goalLabels = values;
+  }
+
   private Long id;
   private String title;
   private String content;

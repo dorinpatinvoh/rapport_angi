@@ -192,7 +192,12 @@ class ReportWorkflowTests {
           .with(user("commercial@angi.test").roles("COMMERCIAL"))
           .with(csrf())
           .contentType("application/json")
-          .content(payload("SUBMITTED"))
+          .content(
+            payload("SUBMITTED").replace(
+              "\"version\":0",
+              "\"version\":" + reports.findById(id).orElseThrow().getVersion()
+            )
+          )
       )
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.status").value("SUBMITTED"))

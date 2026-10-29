@@ -476,9 +476,209 @@ const assert = require("node:assert/strict");
     path: "/tmp/rapport-notifications-mobile.png",
     fullPage: true,
   });
+  // A zone grid updates a commercial's open dashboard through the existing live stream.
+  await login(seller, sellerEmail, freshPassword);
+  await openLink(director, "Grilles d’objectifs");
+  await director
+    .getByRole("button", { name: "Nouvelle grille", exact: true })
+    .click();
+  await director
+    .getByLabel("Niveau de la zone", { exact: true })
+    .selectOption("COMMUNE");
+  await director
+    .getByLabel("Nom de la zone", { exact: true })
+    .fill("Cotonou Nord");
+  await director
+    .getByLabel("Effectif commercial prévu", { exact: true })
+    .fill("5");
+  await director.getByLabel("Objectif mensuel 1", { exact: true }).fill("12");
+  await director
+    .getByRole("button", { name: "Enregistrer la grille", exact: true })
+    .click();
+  await director
+    .getByRole("status")
+    .filter({ hasText: "Grille enregistrée" })
+    .waitFor();
+  await expect(
+    seller.locator("app-objectives").getByText(/\d+ \/ 12/),
+  ).toBeVisible({ timeout: 15000 });
+  const zoneCard = director.locator("article").filter({
+    has: director.getByRole("heading", { name: "Cotonou Nord", exact: true }),
+  });
+  await zoneCard
+    .getByRole("button", { name: "Modifier la grille", exact: true })
+    .click();
+  await director.getByLabel("Objectif mensuel 1", { exact: true }).fill("15");
+  await director
+    .getByRole("button", { name: "Enregistrer la grille", exact: true })
+    .click();
+  await expect(
+    seller.locator("app-objectives").getByText(/\d+ \/ 15/),
+  ).toBeVisible({ timeout: 15000 });
+  await director.setViewportSize({ width: 390, height: 844 });
+  await noOverflow(director);
+  await director.screenshot({
+    path: "/tmp/rapport-zone-grid-mobile.png",
+    fullPage: true,
+  });
+  await director.setViewportSize({ width: 1440, height: 1000 });
+  // A removed custom criterion remains editable on an older saved draft.
+  await zoneCard
+    .getByRole("button", { name: "Modifier la grille", exact: true })
+    .click();
+  await director
+    .getByRole("button", { name: "Ajouter un critère", exact: true })
+    .click();
+  await director
+    .getByLabel("Libellé du critère 4", { exact: true })
+    .fill("Démonstrations boutiques");
+  await director.getByLabel("Objectif mensuel 4", { exact: true }).fill("7");
+  await director
+    .getByRole("button", { name: "Enregistrer la grille", exact: true })
+    .click();
+  await director
+    .getByRole("status")
+    .filter({ hasText: "Grille enregistrée" })
+    .waitFor();
+  await openLink(seller, "Rapports");
+  await seller
+    .getByRole("button", { name: "Rédiger un rapport", exact: true })
+    .click();
+  const draftTitle = "Brouillon critère historique " + tag;
+  await seller.getByLabel("Titre du rapport", { exact: true }).fill(draftTitle);
+  await seller
+    .getByLabel("Comment souhaitez-vous faire votre bilan ?")
+    .selectOption("STATS");
+  await seller
+    .getByLabel("Démonstrations boutiques (objectif / mois : 7)", {
+      exact: true,
+    })
+    .fill("3");
+  await seller
+    .getByRole("button", { name: "Enregistrer le rapport", exact: true })
+    .click();
+  await seller
+    .getByRole("status")
+    .filter({ hasText: "Brouillon enregistré" })
+    .waitFor();
+  await zoneCard
+    .getByRole("button", { name: "Modifier la grille", exact: true })
+    .click();
+  await director
+    .getByRole("button", { name: "Retirer le critère 4", exact: true })
+    .click();
+  await director
+    .getByRole("button", { name: "Enregistrer la grille", exact: true })
+    .click();
+  await director
+    .getByRole("status")
+    .filter({ hasText: "Grille enregistrée" })
+    .waitFor();
+  await seller.goto(root + "/rapports");
+  await seller
+    .locator(".report-card")
+    .filter({ hasText: draftTitle })
+    .getByRole("button", { name: "Modifier", exact: true })
+    .click();
+  await expect(
+    seller.getByLabel("Démonstrations boutiques (objectif / mois : 0)", {
+      exact: true,
+    }),
+  ).toHaveValue("3");
+  await seller
+    .getByRole("button", { name: "Enregistrer le rapport", exact: true })
+    .click();
+  await seller
+    .getByRole("status")
+    .filter({ hasText: "Brouillon enregistré" })
+    .waitFor();
+  // Disabling a commercial invalidates the existing session, without deleting reports.
+  await openLink(director, "Organisation et zones");
+  const sellerMember = director
+    .locator("article")
+    .filter({ hasText: sellerEmail });
+  await sellerMember
+    .getByRole("button", { name: "Désactiver le compte", exact: true })
+    .click();
+  await director
+    .getByRole("button", { name: "Confirmer la désactivation", exact: true })
+    .click();
+  await seller.waitForURL("**/connexion", { timeout: 15000 });
+  await sellerMember
+    .getByRole("button", { name: "Réactiver le compte", exact: true })
+    .click();
+  await director
+    .getByRole("button", { name: "Confirmer la réactivation", exact: true })
+    .click();
+  await director
+    .getByRole("status")
+    .filter({ hasText: "Compte réactivé" })
+    .waitFor();
+  await login(seller, sellerEmail, freshPassword);
+  // A supervisor with dependants stays active and gets an explicit explanation.
+  const supervisorMember = director
+    .locator("article")
+    .filter({ hasText: supervisorEmail });
+  await supervisorMember
+    .getByRole("button", { name: "Désactiver le compte", exact: true })
+    .click();
+  await director
+    .getByRole("button", { name: "Confirmer la désactivation", exact: true })
+    .click();
+  await director
+    .getByRole("alert")
+    .filter({ hasText: /Réaffectez/ })
+    .waitFor();
+  // The root replaces a country director atomically from the organization screen.
+  const replacementEmail = `replacement-${tag}@example.test`;
+  await openLink(admin, "Commerciaux");
+  const createDetails = admin.locator("details").filter({
+    has: admin.getByText("Créer directement un commercial", { exact: true }),
+  });
+  if (!(await createDetails.evaluate((el) => el.open)))
+    await admin
+      .getByText("Créer directement un commercial", { exact: true })
+      .click();
+  await admin.getByLabel("Prénom", { exact: true }).fill("Direction");
+  await admin.getByLabel("Nom", { exact: true }).fill("Relève");
+  await admin.getByLabel("Email", { exact: true }).fill(replacementEmail);
+  await admin.getByLabel("Mot de passe initial").fill(password);
+  await admin
+    .getByRole("button", { name: "Créer et activer le compte", exact: true })
+    .click();
+  await admin
+    .getByRole("status")
+    .filter({ hasText: "créé et activé" })
+    .waitFor();
+  await openLink(admin, "Organisation et zones");
+  await admin
+    .locator("article")
+    .filter({ hasText: directorEmail })
+    .getByRole("button", { name: "Remplacer le directeur", exact: true })
+    .click();
+  const candidateOption = await admin
+    .locator("#directorCandidate option")
+    .filter({ hasText: replacementEmail })
+    .textContent();
+  await admin
+    .getByLabel("Nouveau directeur", { exact: true })
+    .selectOption({ label: candidateOption.trim() });
+  await admin
+    .getByRole("button", { name: "Nommer le remplaçant", exact: true })
+    .click();
+  await admin
+    .getByRole("status")
+    .filter({ hasText: "est le nouveau directeur" })
+    .waitFor();
+  await director.waitForURL("**/connexion", { timeout: 15000 });
+  await login(director, replacementEmail, password);
+  await openLink(director, "Organisation et zones");
+  await director
+    .getByRole("heading", { name: "Direction Relève", exact: true })
+    .waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: live announcement and notification between two sessions without reload, direct creation of director by root and supervisor by director, supervisor zone, commercial assignment, scoped routing, precise correction, monthly goals, supervisor summary, director read-only general report, admin-only commercial creation, login, written report, return, stats report, resubmission, confirmation, AZO profile breakdown, named AZO registrations with add/remove/edit and persisted profiles, PDF download, admin password reset, stale session invalidation, forgot-password form, logout, 360/390/768/1440px without overflow; no browser errors.",
+    "PASS: live zone objectives, safe deactivation/reactivation, guarded supervisor disabling and atomic director replacement, live announcement and notification between two sessions without reload, direct creation of director by root and supervisor by director, supervisor zone, commercial assignment, scoped routing, precise correction, monthly goals, supervisor summary, director read-only general report, admin-only commercial creation, login, written report, return, stats report, resubmission, confirmation, AZO profile breakdown, named AZO registrations with add/remove/edit and persisted profiles, PDF download, admin password reset, stale session invalidation, forgot-password form, logout, 360/390/768/1440px without overflow; no browser errors.",
   );
   if (process.env.SMOKE_CROSS_ORIGIN) assert.ok(crossOriginWrites > 10);
   await browser.close();

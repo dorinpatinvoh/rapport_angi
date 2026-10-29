@@ -3,7 +3,7 @@ import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { finalize, switchMap } from "rxjs";
 import { AuthService } from "../core/auth.service";
-import { SalesService, Member } from "../core/sales.service";
+import { SalesService, Member, ZoneGrid } from "../core/sales.service";
 import { apiError } from "../core/report.service";
 @Component({
   standalone: true,
@@ -150,6 +150,7 @@ import { apiError } from "../core/report.service";
                 id="managerCountry"
                 name="managerCountry"
                 [(ngModel)]="newAccount.country"
+                (ngModelChange)="newZoneConfigId = null"
                 class="form-select"
                 required
               >
@@ -182,6 +183,7 @@ import { apiError } from "../core/report.service";
                   id="managerTeam"
                   name="managerTeam"
                   [(ngModel)]="newAccount.team"
+                  (ngModelChange)="newZoneConfigId = null"
                   class="form-select"
                   required
                 >
@@ -197,6 +199,7 @@ import { apiError } from "../core/report.service";
                   id="managerLevel"
                   name="managerLevel"
                   [(ngModel)]="newLevel"
+                  [disabled]="newZoneConfigId !== null"
                   class="form-select"
                   required
                 >
@@ -205,12 +208,39 @@ import { apiError } from "../core/report.service";
                 </select>
               </div>
               <div class="col-12">
+                <label for="managerGrid" class="form-label"
+                  >Zone et grille d’objectifs du superviseur</label
+                ><select
+                  id="managerGrid"
+                  name="managerGrid"
+                  [(ngModel)]="newZoneConfigId"
+                  (ngModelChange)="selectNewZone($event)"
+                  class="form-select"
+                >
+                  <option [ngValue]="null">Zone libre (grille standard)</option>
+                  @for (
+                    z of zoneOptions(newAccount.country, newAccount.team);
+                    track z.id
+                  ) {
+                    <option [ngValue]="z.id">
+                      {{ z.name }} ·
+                      {{ z.level === "DEPARTMENT" ? "Département" : "Commune" }}
+                    </option>
+                  }</select
+                ><a
+                  routerLink="/grilles-objectifs"
+                  class="form-text d-inline-block"
+                  >Configurer les grilles par zone</a
+                >
+              </div>
+              <div class="col-12">
                 <label for="managerZone" class="form-label"
                   >Zone du nouveau superviseur</label
                 ><input
                   id="managerZone"
                   name="managerZone"
                   [(ngModel)]="newZone"
+                  [readOnly]="newZoneConfigId !== null"
                   class="form-control"
                   required
                   pattern=".*\\S.*"
@@ -321,14 +351,14 @@ import { apiError } from "../core/report.service";
           <p>
             <span class="team-pill">{{ roleLabel(m.role) }}</span>
             <span class="small" [class.text-success]="m.enabled">{{
-              m.enabled ? "Actif" : "En attente"
+              m.enabled ? "Actif" : "Inactif"
             }}</span>
           </p>
           <p class="small text-secondary mb-2">
             {{ countryLabel(m.country) }} ·
             {{
               m.role === "DIRECTEUR_COMMERCIAL"
-                ? m.projects.join(" / ")
+                ? m.projects.join(" / ") || "Sans affectation"
                 : m.team || "Projet à affecter"
             }}
           </p>
@@ -358,6 +388,30 @@ import { apiError } from "../core/report.service";
               Affecter / nommer
             </button>
           }
+          @if (statusAllowed(m)) {
+            <button
+              class="btn mt-2"
+              [class.btn-outline-danger]="m.enabled"
+              [class.btn-outline-primary]="!m.enabled"
+              (click)="statusTarget.set(m)"
+              [disabled]="busy()"
+            >
+              {{ m.enabled ? "Désactiver le compte" : "Réactiver le compte" }}
+            </button>
+          }
+          @if (
+            auth.isSuperAdmin() &&
+            m.role === "DIRECTEUR_COMMERCIAL" &&
+            m.configured
+          ) {
+            <button
+              class="btn btn-outline-primary mt-2"
+              (click)="replace(m)"
+              [disabled]="busy()"
+            >
+              Remplacer le directeur
+            </button>
+          }
         </article>
       } @empty {
         <div class="panel empty">
@@ -365,6 +419,85 @@ import { apiError } from "../core/report.service";
         </div>
       }
     </div>
+    @if (statusTarget(); as m) {
+      <section class="panel mt-4" aria-label="Confirmation du statut">
+        <h2 class="h4">
+          {{ m.enabled ? "Désactiver" : "Réactiver" }} {{ m.name }}
+        </h2>
+        <p>
+          {{
+            m.enabled
+              ? "Le compte ne pourra plus se connecter. Ses rapports et son historique sont conservés. Un superviseur doit avoir réaffecté ses commerciaux et terminé ses synthèses."
+              : "Le compte pourra de nouveau se connecter avec son mot de passe actuel."
+          }}
+        </p>
+        <div class="d-flex gap-2 flex-wrap">
+          <button
+            class="btn"
+            [class.btn-danger]="m.enabled"
+            [class.btn-primary]="!m.enabled"
+            (click)="confirmStatus()"
+            [disabled]="busy()"
+          >
+            {{
+              m.enabled
+                ? "Confirmer la désactivation"
+                : "Confirmer la réactivation"
+            }}</button
+          ><button
+            class="btn btn-outline-secondary"
+            (click)="statusTarget.set(null)"
+          >
+            Annuler
+          </button>
+        </div>
+      </section>
+    }
+    @if (replacement(); as m) {
+      <section class="panel mt-4" id="director-replacement">
+        <p class="eyebrow">Administration globale</p>
+        <h2 class="h4">
+          Remplacer le directeur de {{ countryLabel(m.country) }}
+        </h2>
+        <p>
+          Le nouveau responsable reprend les projets
+          {{ m.projects.join(" / ") }}. Le directeur actuel sera désactivé, avec
+          conservation de son compte et de son historique. En cas de refus, le
+          directeur actuel reste en place.
+        </p>
+        <label for="directorCandidate" class="form-label"
+          >Nouveau directeur</label
+        ><select
+          id="directorCandidate"
+          [(ngModel)]="candidateId"
+          class="form-select"
+        >
+          <option [ngValue]="null">Choisir un compte du même pays</option>
+          @for (c of candidates(); track c.id) {
+            <option [ngValue]="c.id">{{ c.name }} · {{ c.email }}</option>
+          }
+        </select>
+        <p class="form-text">
+          Créez d’abord son compte dans Commerciaux si nécessaire. Un
+          superviseur doit transmettre ses synthèses et réaffecter ses
+          commerciaux avant sa nomination.
+        </p>
+        <div class="d-flex gap-2 flex-wrap">
+          <button
+            class="btn btn-primary"
+            (click)="confirmReplacement()"
+            [disabled]="!candidateId || busy()"
+          >
+            Nommer le remplaçant</button
+          ><button
+            class="btn btn-outline-secondary"
+            (click)="replacement.set(null)"
+          >
+            Annuler
+          </button>
+        </div>
+      </section>
+    }
     @if (selected(); as m) {
       <section class="panel mt-4 assignment-panel" id="assignment-form">
         <p class="eyebrow">Organisation de l’équipe</p>
@@ -396,7 +529,7 @@ import { apiError } from "../core/report.service";
                 id="assignmentCountry"
                 name="country"
                 [(ngModel)]="country"
-                (ngModelChange)="supervisorId = null"
+                (ngModelChange)="supervisorId = null; zoneConfigId = null"
                 class="form-select"
                 required
               >
@@ -425,7 +558,7 @@ import { apiError } from "../core/report.service";
                   id="assignmentTeam"
                   name="team"
                   [(ngModel)]="team"
-                  (ngModelChange)="supervisorId = null"
+                  (ngModelChange)="supervisorId = null; zoneConfigId = null"
                   class="form-select"
                   required
                 >
@@ -443,11 +576,31 @@ import { apiError } from "../core/report.service";
                   id="assignmentLevel"
                   name="zoneLevel"
                   [(ngModel)]="zoneLevel"
+                  [disabled]="zoneConfigId !== null"
                   class="form-select"
                   required
                 >
                   <option value="DEPARTMENT">Département</option>
                   <option value="COMMUNE">Commune</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label for="assignmentGrid" class="form-label"
+                  >Zone et grille d’objectifs</label
+                ><select
+                  id="assignmentGrid"
+                  name="assignmentGrid"
+                  [(ngModel)]="zoneConfigId"
+                  (ngModelChange)="selectZone($event)"
+                  class="form-select"
+                >
+                  <option [ngValue]="null">Zone libre (grille standard)</option>
+                  @for (z of zoneOptions(country, team); track z.id) {
+                    <option [ngValue]="z.id">
+                      {{ z.name }} ·
+                      {{ z.level === "DEPARTMENT" ? "Département" : "Commune" }}
+                    </option>
+                  }
                 </select>
               </div>
               <div class="col-12">
@@ -457,6 +610,7 @@ import { apiError } from "../core/report.service";
                   id="assignmentZone"
                   name="zone"
                   [(ngModel)]="zone"
+                  [readOnly]="zoneConfigId !== null"
                   required
                   maxlength="150"
                   class="form-control"
@@ -547,10 +701,112 @@ export class OrganizationComponent {
   newProjects = ["AZO", "ZEHAMI"];
   countryCode = "";
   countryName = "";
-  readonly unconfigured = (m: Member) => !m.configured;
+  readonly unconfigured = (m: Member) => m.enabled && !m.configured;
+  readonly zones = signal<ZoneGrid[]>([]);
+  readonly statusTarget = signal<Member | null>(null);
+  readonly replacement = signal<Member | null>(null);
+  candidateId: number | null = null;
+  zoneConfigId: number | null = null;
+  newZoneConfigId: number | null = null;
+  zoneOptions(country: string, project: string) {
+    return this.zones().filter(
+      (z) => z.country === country && z.project === project,
+    );
+  }
+  selectNewZone(id: number | null) {
+    const z = this.zones().find((z) => z.id === id);
+    if (z) {
+      this.newZone = z.name;
+      this.newLevel = z.level;
+    }
+  }
+  selectZone(id: number | null) {
+    const z = this.zones().find((z) => z.id === id);
+    if (z) {
+      this.zone = z.name;
+      this.zoneLevel = z.level;
+    }
+  }
+  statusAllowed(m: Member) {
+    return (
+      this.auth.isDirector() &&
+      m.id !== this.auth.user()?.id &&
+      ["COMMERCIAL", "SUPERVISEUR"].includes(m.role)
+    );
+  }
+  confirmStatus() {
+    const m = this.statusTarget();
+    if (!m || this.busy()) return;
+    this.busy.set(true);
+    this.error.set("");
+    this.api
+      .status(m, !m.enabled)
+      .pipe(finalize(() => this.busy.set(false)))
+      .subscribe({
+        next: () => {
+          this.statusTarget.set(null);
+          this.success.set(
+            m.enabled
+              ? "Compte désactivé. Historique conservé."
+              : "Compte réactivé.",
+          );
+          this.load();
+        },
+        error: (e) => this.error.set(apiError(e)),
+      });
+  }
+  replace(m: Member) {
+    this.replacement.set(m);
+    this.candidateId = null;
+    this.error.set("");
+    setTimeout(() =>
+      document
+        .getElementById("director-replacement")
+        ?.scrollIntoView({ behavior: "smooth" }),
+    );
+  }
+  candidates() {
+    const m = this.replacement();
+    return this.members().filter(
+      (c) =>
+        m &&
+        c.id !== m.id &&
+        c.country === m.country &&
+        !["SUPER_ADMIN", "ADMIN"].includes(c.role) &&
+        (c.role !== "DIRECTEUR_COMMERCIAL" || !c.configured) &&
+        (c.enabled || (c.role === "DIRECTEUR_COMMERCIAL" && !c.configured)),
+    );
+  }
+  confirmReplacement() {
+    const m = this.replacement();
+    if (!m || !this.candidateId || this.busy()) return;
+    this.busy.set(true);
+    this.error.set("");
+    this.api
+      .replaceDirector(m, this.candidateId)
+      .pipe(finalize(() => this.busy.set(false)))
+      .subscribe({
+        next: (r) => {
+          this.replacement.set(null);
+          this.selected.set(null);
+          this.success.set(
+            r.name +
+              " est le nouveau directeur. Le compte précédent est désactivé et ses données sont conservées.",
+          );
+          this.load();
+        },
+        error: (e) => this.error.set(apiError(e)),
+      });
+  }
+
   constructor() {
     this.newAccount.country = this.auth.user()?.country || "BJ";
     this.newAccount.team = this.allowedProjects()[0] || "AZO";
+    if (this.auth.isDirector())
+      this.api.zones().subscribe({
+        next: (z) => this.zones.set(z),
+        error: (e) => this.error.set(apiError(e)),
+      });
     this.loadCountries();
     this.load();
   }
@@ -660,6 +916,8 @@ export class OrganizationComponent {
             zone: this.newRole === "SUPERVISEUR" ? this.newZone : "",
             projects: this.newProjects,
             zoneLevel: this.newLevel,
+            zoneConfigId:
+              this.newRole === "SUPERVISEUR" ? this.newZoneConfigId : null,
           }),
         ),
         finalize(() => this.busy.set(false)),
@@ -675,6 +933,7 @@ export class OrganizationComponent {
             country: this.auth.user()?.country || "BJ",
           };
           this.newZone = "";
+          this.newZoneConfigId = null;
           this.success.set(
             this.roleLabel(m.role) +
               " créé et activé. Transmettez-lui personnellement ses identifiants.",
@@ -711,6 +970,7 @@ export class OrganizationComponent {
     this.role = m.role;
     this.team = m.team || this.allowedProjects()[0] || "AZO";
     this.zone = m.zone || "";
+    this.zoneConfigId = m.zoneConfigId;
     this.country = m.country;
     this.zoneLevel = m.zoneLevel || "COMMUNE";
     this.projects = [...m.projects];
@@ -742,6 +1002,8 @@ export class OrganizationComponent {
             country: this.country,
             projects: this.projects,
             zoneLevel: this.zoneLevel,
+            zoneConfigId:
+              this.role === "SUPERVISEUR" ? this.zoneConfigId : null,
             supervisorId: this.role === "COMMERCIAL" ? this.supervisorId : null,
           }),
         ),

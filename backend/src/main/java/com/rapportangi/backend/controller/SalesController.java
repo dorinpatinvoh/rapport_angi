@@ -13,8 +13,13 @@ import org.springframework.web.bind.annotation.*;
 public class SalesController {
 
   private final SalesManagementService sales;
+  private final ZoneGoalsService zoneGoals;
 
-  public SalesController(SalesManagementService sales) {
+  public SalesController(
+    SalesManagementService sales,
+    ZoneGoalsService zoneGoals
+  ) {
+    this.zoneGoals = zoneGoals;
     this.sales = sales;
   }
 
@@ -29,7 +34,8 @@ public class SalesController {
     @Size(max = 150) String zone,
     @Size(max = 2)
     java.util.Set<@NotNull @Pattern(regexp = "AZO|ZEHAMI") String> projects,
-    @Pattern(regexp = "DEPARTMENT|COMMUNE") String zoneLevel
+    @Pattern(regexp = "DEPARTMENT|COMMUNE") String zoneLevel,
+    @Positive Long zoneConfigId
   ) {}
 
   @PostMapping("/members")
@@ -41,12 +47,13 @@ public class SalesController {
     @Valid @RequestBody CreateMember r,
     Authentication a
   ) {
-    return sales.create(
+    return sales.createWithZone(
       r.account(),
       r.role(),
       r.zone(),
       r.projects(),
       r.zoneLevel(),
+      r.zoneConfigId(),
       a
     );
   }
@@ -61,7 +68,8 @@ public class SalesController {
     @Pattern(regexp = "[A-Z]{2}") String country,
     @Size(max = 2)
     java.util.Set<@NotNull @Pattern(regexp = "AZO|ZEHAMI") String> projects,
-    @Pattern(regexp = "DEPARTMENT|COMMUNE") String zoneLevel
+    @Pattern(regexp = "DEPARTMENT|COMMUNE") String zoneLevel,
+    @Positive Long zoneConfigId
   ) {}
 
   @PutMapping("/members/{id}")
@@ -79,6 +87,46 @@ public class SalesController {
       r.country(),
       r.projects(),
       r.zoneLevel(),
+      r.zoneConfigId(),
+      a
+    );
+  }
+
+  public record Status(
+    boolean enabled,
+    @NotNull @PositiveOrZero Long revision
+  ) {}
+
+  @PutMapping("/members/{id}/status")
+  @org.springframework.security.access.prepost.PreAuthorize(
+    "hasAnyRole('SUPER_ADMIN','DIRECTEUR_COMMERCIAL')"
+  )
+  public SalesManagementService.Member status(
+    @PathVariable Long id,
+    @Valid @RequestBody Status r,
+    Authentication a
+  ) {
+    return sales.setStatus(id, r.enabled(), r.revision(), a);
+  }
+
+  public record Replacement(
+    @NotNull @Pattern(regexp = "[A-Z]{2}") String country,
+    @NotNull @Positive Long expectedDirectorId,
+    @NotNull @Positive Long candidateId
+  ) {}
+
+  @PostMapping("/directors/replace")
+  @org.springframework.security.access.prepost.PreAuthorize(
+    "hasRole('SUPER_ADMIN')"
+  )
+  public SalesManagementService.Member replace(
+    @Valid @RequestBody Replacement r,
+    Authentication a
+  ) {
+    return sales.replaceDirector(
+      r.country(),
+      r.expectedDirectorId(),
+      r.candidateId(),
       a
     );
   }
@@ -106,8 +154,11 @@ public class SalesController {
   }
 
   @GetMapping("/goals")
-  public List<SalesGoals.Definition> goals(@RequestParam String team) {
-    return SalesGoals.definitions(team);
+  public List<SalesGoals.Definition> goals(
+    @RequestParam String team,
+    Authentication a
+  ) {
+    return zoneGoals.goals(team, a);
   }
 
   @GetMapping("/objectives")

@@ -159,9 +159,15 @@ public class ReportPdfService {
           12,
           new Color(89, 22, 129)
         );
-        for (var goal : SalesGoals.definitions(report.getTeam()))
-          if (report.getGoalCounts().containsKey(goal.code())) layout.text(
-            goal.label() + " : " + report.getGoalCounts().get(goal.code()),
+        for (var goal : new java.util.TreeMap<>(
+          report.getGoalCounts()
+        ).entrySet())
+          layout.text(
+            report
+              .getGoalLabels()
+              .getOrDefault(goal.getKey(), SalesGoals.label(goal.getKey())) +
+              " : " +
+              goal.getValue(),
             11,
             Color.BLACK
           );

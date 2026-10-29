@@ -67,7 +67,7 @@ import {
                 <h3 class="h5">{{ t }}</h3>
                 @for (g of total(t) | keyvalue; track g.key) {
                   <p>
-                    {{ labels[g.key] || g.key }} :
+                    {{ goalLabel(g.key) }} :
                     <strong>{{ g.value }}</strong>
                   </p>
                 } @empty {
@@ -109,7 +109,7 @@ import {
             }
             @for (g of r.goalCounts | keyvalue; track g.key) {
               <span class="team-pill me-2 mb-2 d-inline-block"
-                >{{ labels[g.key] || g.key }} : {{ g.value }}</span
+                >{{ goalLabel(g.key) }} : {{ g.value }}</span
               >
             } @empty {
               <p class="small text-secondary">
@@ -176,7 +176,7 @@ import {
             <p class="report-body">{{ s.content }}</p>
             @for (g of s.totals | keyvalue; track g.key) {
               <p>
-                {{ labels[g.key] || g.key }} : <strong>{{ g.value }}</strong>
+                {{ goalLabel(g.key) }} : <strong>{{ g.value }}</strong>
               </p>
             }
             <p class="small">Rapports sources :</p>
@@ -212,6 +212,13 @@ export class SummariesComponent {
   readonly loading = signal(false);
   readonly busy = signal(false);
   readonly labels = goalLabels;
+  goalLabel(code: string) {
+    return (
+      this.summaries().find((s) => s.goalLabels?.[code])?.goalLabels[code] ||
+      this.labels[code] ||
+      code
+    );
+  }
   readonly label = statusLabel;
   daily() {
     return this.reports().filter(

@@ -1,3 +1,5 @@
+import { effect, untracked } from "@angular/core";
+import { CommunicationService } from "../core/communication.service";
 import { apiUrl } from "../core/api-url";
 import { Component, computed, inject, signal } from "@angular/core";
 import { ActivatedRoute } from "@angular/router";
@@ -34,19 +36,36 @@ export class ReportsComponent {
   private sales = inject(SalesService);
   private route = inject(ActivatedRoute);
   readonly goalLabels = goalLabels;
+  private comms = inject(CommunicationService);
+  private lastGoalEvent = 0;
+  reportGoals(r: Report) {
+    return Object.keys(r.goalCounts || {}).map((code) => ({
+      code,
+      label: r.goalLabels?.[code] || goalLabels[code] || code,
+      target: 0,
+    }));
+  }
+
   readonly goals = signal<Record<string, Goal[]>>({});
   readonly goalForm = new FormGroup<Record<string, FormControl<number>>>({});
   readonly dateFilter = signal("");
   readonly correctionLocation = signal("");
   goalDefs(team?: string | null) {
-    return (
-      this.goals()[
-        team ??
-          this.editing()?.team ??
-          this.auth.user()?.team ??
-          this.form.controls.team.value
-      ] || []
-    );
+    const chosen =
+      team ??
+      this.editing()?.team ??
+      this.auth.user()?.team ??
+      this.form.controls.team.value;
+    const defs = this.goals()[chosen] || [];
+    const old = this.editing();
+    return old && old.team === chosen
+      ? [
+          ...defs,
+          ...this.reportGoals(old).filter(
+            (g) => !defs.some((d) => d.code === g.code),
+          ),
+        ]
+      : defs;
   }
   readonly auth = inject(AuthService);
   private fb = inject(FormBuilder);
@@ -175,29 +194,42 @@ export class ReportsComponent {
   profileTotal(r: Report) {
     return Object.values(r.profileCounts || {}).reduce((a, b) => a + b, 0);
   }
-  constructor() {
+  loadGoals() {
     for (const team of ["AZO", "ZEHAMI"])
       this.sales.goals(team).subscribe({
         next: (defs) => {
           this.goals.update((g) => ({ ...g, [team]: defs }));
-          for (const d of defs)
-            this.goalForm.addControl(
-              d.code,
-              new FormControl(0, {
-                nonNullable: true,
-                validators: [
-                  Validators.required,
-                  Validators.min(0),
-                  Validators.max(1000000),
-                  Validators.pattern(/^\d+$/),
-                ],
-              }),
-            );
-          if (this.editing()?.goalCounts)
-            this.goalForm.patchValue(this.editing()!.goalCounts);
+          const extras =
+            this.editing()?.team === team
+              ? this.reportGoals(this.editing()!)
+              : [];
+          for (const d of [...defs, ...extras])
+            if (!this.goalForm.controls[d.code])
+              this.goalForm.addControl(
+                d.code,
+                new FormControl(this.editing()?.goalCounts[d.code] || 0, {
+                  nonNullable: true,
+                  validators: [
+                    Validators.required,
+                    Validators.min(0),
+                    Validators.max(1000000),
+                    Validators.pattern(/^\d+$/),
+                  ],
+                }),
+              );
         },
         error: (e) => this.error.set(apiError(e)),
       });
+  }
+  constructor() {
+    this.loadGoals();
+    effect(() => {
+      const id = this.comms.events()[0]?.id || 0;
+      if (id && id !== this.lastGoalEvent) {
+        this.lastGoalEvent = id;
+        untracked(() => this.loadGoals());
+      }
+    });
     this.http.get<AzoProfile[]>("/api/report-profiles").subscribe({
       next: (defs) => {
         this.profileDefs.set(defs);
@@ -277,6 +309,20 @@ export class ReportsComponent {
   edit(r?: Report) {
     this.registrationForm.clear();
     for (const entry of r?.azoRegistrations ?? []) this.addRegistration(entry);
+    for (const g of r ? this.reportGoals(r) : [])
+      if (!this.goalForm.controls[g.code])
+        this.goalForm.addControl(
+          g.code,
+          new FormControl(0, {
+            nonNullable: true,
+            validators: [
+              Validators.required,
+              Validators.min(0),
+              Validators.max(1000000),
+              Validators.pattern(/^\d+$/),
+            ],
+          }),
+        );
     this.goalForm.reset();
     if (r?.goalCounts) this.goalForm.patchValue(r.goalCounts);
     this.editing.set(r ?? null);

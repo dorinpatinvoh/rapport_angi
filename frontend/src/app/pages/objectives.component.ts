@@ -1,7 +1,8 @@
-import { Component, inject, signal } from "@angular/core";
+import { Component, effect, untracked, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { finalize } from "rxjs";
 import { SalesService, Monthly, localDay } from "../core/sales.service";
+import { CommunicationService } from "../core/communication.service";
 import { apiError } from "../core/report.service";
 @Component({
   selector: "app-objectives",
@@ -45,6 +46,7 @@ import { apiError } from "../core/report.service";
             <p class="small text-secondary">
               {{ row.team }} · {{ row.zone || "Zone à affecter" }}
             </p>
+            <p class="small text-secondary">{{ row.gridSource }}</p>
             @for (g of row.goals; track g.code) {
               <div class="mb-3">
                 <div class="d-flex justify-content-between flex-wrap gap-1">
@@ -63,9 +65,11 @@ import { apiError } from "../core/report.service";
                 </div>
                 <span class="small"
                   >{{
-                    g.remaining === 0
-                      ? "Objectif atteint !"
-                      : g.remaining + " à atteindre"
+                    g.target === 0
+                      ? "Aucun minimum"
+                      : g.remaining === 0
+                        ? "Objectif atteint !"
+                        : g.remaining + " à atteindre"
                   }}
                   · {{ g.percent }} %</span
                 >
@@ -96,12 +100,21 @@ import { apiError } from "../core/report.service";
 })
 export class ObjectivesComponent {
   private api = inject(SalesService);
+  private comms = inject(CommunicationService);
+  private lastEvent = 0;
   month = localDay().slice(0, 7);
   readonly rows = signal<Monthly[]>([]);
   readonly error = signal("");
   readonly loading = signal(false);
   constructor() {
     this.load();
+    effect(() => {
+      const id = this.comms.events()[0]?.id || 0;
+      if (id && id !== this.lastEvent) {
+        this.lastEvent = id;
+        untracked(() => this.load());
+      }
+    });
   }
   load() {
     if (!this.month) return;

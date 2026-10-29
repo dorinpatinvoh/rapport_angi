@@ -11,6 +11,7 @@ import {
   CommunicationsComponent,
   NotificationsComponent,
 } from "./pages/communications.component";
+import { ZoneGridsComponent } from "./pages/zone-grids.component";
 export const routes: Routes = [
   { path: "", redirectTo: "dashboard", pathMatch: "full" },
   {
@@ -28,6 +29,11 @@ export const routes: Routes = [
     path: "syntheses",
     component: SummariesComponent,
     canActivate: [managementGuard],
+  },
+  {
+    path: "grilles-objectifs",
+    component: ZoneGridsComponent,
+    canActivate: [directorGuard],
   },
   { path: "inscription", redirectTo: "connexion", pathMatch: "full" },
   {

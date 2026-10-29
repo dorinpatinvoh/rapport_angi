@@ -1,0 +1,5 @@
+CREATE TABLE goal_zones(id BIGSERIAL PRIMARY KEY, country_code VARCHAR(2) NOT NULL REFERENCES sales_countries(code), project_code VARCHAR(20) NOT NULL, zone_level VARCHAR(20) NOT NULL CHECK(zone_level IN ('DEPARTMENT','COMMUNE')), name VARCHAR(150) NOT NULL, zone_key VARCHAR(200) NOT NULL, parent_id BIGINT REFERENCES goal_zones(id), version BIGINT NOT NULL DEFAULT 0, UNIQUE(country_code,project_code,zone_level,zone_key));
+CREATE TABLE zone_goal_grids(zone_id BIGINT PRIMARY KEY REFERENCES goal_zones(id), planned_staff INTEGER NOT NULL CHECK(planned_staff BETWEEN 0 AND 10000), inherit_goals BOOLEAN NOT NULL);
+CREATE TABLE zone_goal_metrics(zone_id BIGINT NOT NULL REFERENCES goal_zones(id), position INTEGER NOT NULL, code VARCHAR(50) NOT NULL, label VARCHAR(120) NOT NULL, target INTEGER NOT NULL CHECK(target BETWEEN 0 AND 1000000), PRIMARY KEY(zone_id,position), UNIQUE(zone_id,code));
+ALTER TABLE users ADD COLUMN zone_config_id BIGINT REFERENCES goal_zones(id);
+CREATE TABLE report_goal_labels(report_id BIGINT NOT NULL REFERENCES reports(id) ON DELETE CASCADE, goal_code VARCHAR(50) NOT NULL, label VARCHAR(120) NOT NULL, PRIMARY KEY(report_id,goal_code));

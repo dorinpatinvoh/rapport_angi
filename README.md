@@ -367,7 +367,7 @@ Après un `git pull origin main`, reconstruire le frontend avec `npm ci` puis `n
 
 L’application conserve sa pile **Angular 20 / Spring Boot 4 / Java 21 / PostgreSQL**. Aucun changement vers React/Vite ou Node n’est nécessaire pour les fonctionnalités demandées.
 
-- **Un directeur par pays** : le champ réservé au directeur a un index unique en base et les nominations verrouillent la ligne du pays. Un compte inactif conserve sa place : réaffecter son rôle ou son pays avant de nommer un remplaçant. Le pays utilise un code ISO à deux lettres.
+- **Un directeur par pays** : le champ réservé au directeur a un index unique en base et les nominations verrouillent la ligne du pays. Un remplacement se fait désormais depuis **Organisation et zones → Remplacer le directeur** ; le compte précédent est désactivé et libère sa place dans la même transaction. Le pays utilise un code ISO à deux lettres.
 - **Plusieurs projets** : le super administrateur coche AZO et/ou ZEHAMI pour chaque directeur. Le directeur peut gérer les superviseurs et commerciaux uniquement dans ce pays et ces projets. Le super administrateur possède les mêmes fonctions sans restriction de périmètre.
 - **Zones** : sélectionner Département ou Commune, puis saisir le nom géographique. Le directeur rattache directement les commerciaux à un superviseur actif de la même combinaison pays/projet. Les changements de périmètre sont bloqués tant que les rapports concernés ne sont pas terminés.
 - **Communication** : la rubrique Communiqués est accessible à tous les comptes connectés. La direction publie dans son pays et ses projets ; le super administrateur peut choisir un pays ou tous les pays, et un ou plusieurs projets ou tous. Les utilisateurs consultent uniquement les annonces qui les concernent. Les textes sont affichés comme texte, sans HTML exécuté.
@@ -392,3 +392,36 @@ Les tests couvrent les accès entre pays/projets, l’unicité du directeur jusq
 ### Mise en ligne de la nouvelle interface
 
 Le backend Render reçoit les migrations lors du déploiement de main. Pour LWS : `git pull origin main`, puis dans `frontend`, `npm ci` et `npm run build:lws`. Envoyer tout le contenu de `dist/frontend/browser/`, y compris `.htaccess`, dans `/rapports.angidsnpro.com/`. Le build LWS utilise désormais des noms de fichiers avec empreinte pour éviter l’affichage d’un ancien JavaScript après une mise à jour. Conserver les fichiers de l’ancienne version jusqu’à la fin du transfert pour les sessions déjà ouvertes, puis actualiser la page.
+
+
+## Administration autonome des grilles et des comptes (V9)
+
+### Grilles par département et commune
+
+La rubrique **Grilles d’objectifs**, accessible au SUPER_ADMIN et au DIRECTEUR_COMMERCIAL, permet de créer une zone par pays/projet/niveau, puis d’enregistrer ses critères et objectifs mensuels. Les pays, projets et permissions restent ceux de V8. Aucune valeur issue d’une image non reçue n’est inventée ni préchargée.
+
+- Chaque ligne contient un libellé et une cible **mensuelle par commercial**. On peut ajouter jusqu’à 30 critères, y compris de nouveaux critères, sans modifier le code. L’identifiant de suivi est généré lors de la création et conservé lors d’un changement de libellé.
+- L’effectif commercial prévu est un indicateur de planification (0 à 10 000), pas un blocage d’affectation. Le total prévu est `cible individuelle × effectif prévu`. L’écran affiche aussi l’effectif actif réellement rattaché à la zone ; un département inclut ses communes.
+- Une commune peut définir sa grille ou hériter de celle d’un département du même pays/projet. Les cibles héritées changent dès la mise à jour du département. Un objectif individuel à zéro signifie aucun minimum et ne provoque pas de division par zéro.
+- Le pays, le projet, le niveau et le nom d’une zone créée sont fixes. Pour changer ce périmètre, créer une autre zone puis réaffecter le superviseur. Les critères, les cibles, l’effectif prévu et le département parent d’une commune restent modifiables.
+- Dans **Organisation et zones**, sélectionner la zone configurée lors de la création ou de l’affectation d’un superviseur. Ses commerciaux reçoivent automatiquement la grille, sans copier les objectifs dans chaque compte. Les zones libres existantes gardent la grille standard tant qu’aucune grille correspondante n’est définie. Une grille créée avec le même nom/pays/projet/niveau rattache les superviseurs existants correspondants.
+- Les objectifs consultés utilisent la grille actuelle, y compris pour un mois précédent sélectionné. Les réalisations des rapports confirmés ne sont pas réécrites. Les libellés enregistrés dans les rapports et leurs PDF sont conservés ; les synthèses peuvent afficher les critères personnalisés. Les statistiques mobiles absentes pour un nouveau critère ne sont pas fabriquées.
+- Les modifications sont annoncées via le journal et le flux en direct. Les tableaux d’objectifs se recalculent sans rechargement. Un changement de superviseur/zone au sein du même pays/projet ne déconnecte pas le commercial ; un changement de droits, de pays ou de projet continue d’invalider sa session.
+
+### Désactivation et remplacement
+
+**Organisation et zones → Désactiver le compte / Réactiver le compte** fonctionne pour les commerciaux et superviseurs dans le périmètre du gestionnaire. La confirmation précise l’action. La désactivation invalide les sessions sans supprimer le compte, les rapports ni le journal. Un superviseur doit d’abord réaffecter tous ses commerciaux et terminer ses validations/synthèses. Les comptes privilégiés et le compte de l’acteur sont protégés.
+
+**Remplacer le directeur** est réservé au SUPER_ADMIN. Choisir un compte du même pays, puis confirmer la nomination. Les projets du pays sont transférés au nouveau directeur, l’ancien compte est conservé mais désactivé et sa place de directeur est libérée. Un ancien directeur désactivé peut être choisi pour une nouvelle relève dans son pays. Le candidat doit avoir terminé ses rapports et, s’il est superviseur, réaffecté ses commerciaux et terminé ses synthèses. Toute erreur annule l’ensemble du remplacement : l’ancien directeur conserve sa place et ses accès. Le pays est verrouillé pendant l’opération et l’index unique reste appliqué. Une demande reposant sur un ancien directeur déjà remplacé est refusée.
+
+### API et stockage
+
+- `GET/POST /api/sales/zones`, `PUT /api/sales/zones/{id}` : grilles de la direction, avec `country`, `project`, `level`, `name`, `parentId`, `plannedStaff`, `inheritGoals`, `goals:[{code,label,target}]` et `version` à la modification. Une version périmée est refusée pour éviter d’écraser une autre modification.
+- `zoneConfigId` peut être fourni lors de la création et de l’affectation d’un superviseur ; le serveur vérifie le pays et le projet et reprend le nom/niveau de cette zone.
+- `PUT /api/sales/members/{id}/status` : `{enabled,revision}` ; la révision vient du membre renvoyé par l’API.
+- `POST /api/sales/directors/replace` : `{country,expectedDirectorId,candidateId}` ; réservé au SUPER_ADMIN.
+- V9 ajoute `goal_zones`, `zone_goal_grids`, `zone_goal_metrics`, le lien de zone sur `users` et les libellés d’objectifs des rapports dans `report_goal_labels`. Les comptes et données existants sont conservés.
+
+Les tests couvrent les changements immédiats de cibles, l’héritage et la surcharge par commune, les libellés historiques/PDF, les cibles nulles, les conflits de version, les périmètres de pays/projet, les désactivations protégées, le remplacement et son annulation complète en cas de refus. Le parcours navigateur vérifie l’actualisation d’un tableau ouvert, la fermeture de session à la désactivation, la réactivation et la connexion du directeur remplaçant.
+
+Après récupération de `main`, reconstruire avec `npm run build:lws`, puis transférer le contenu de `frontend/dist/frontend/browser/` sur LWS. Le backend applique V9 au déploiement Render ; la nouvelle interface nécessite cette version backend.

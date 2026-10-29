@@ -64,6 +64,12 @@ import {
                 ><i aria-hidden="true" class="bi bi-people"></i>Commerciaux</a
               >
             }
+            @if (auth.isDirector()) {
+              <a routerLink="/grilles-objectifs" routerLinkActive="active"
+                ><i class="bi bi-bullseye" aria-hidden="true"></i>Grilles
+                d’objectifs</a
+              >
+            }
             @if (auth.isManagement()) {
               <a routerLink="/organisation" routerLinkActive="active"
                 >Organisation et zones</a

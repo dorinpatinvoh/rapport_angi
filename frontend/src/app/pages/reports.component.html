@@ -511,7 +511,7 @@
         Zone : {{ r.zone || "Non renseignée" }}. Comptage mensuel après
         validation.
       </p>
-      @for (g of goalDefs(r.team); track g.code) {
+      @for (g of reportGoals(r); track g.code) {
         <p>
           {{ g.label }} :
           <strong>{{ r.goalCounts[g.code] ?? "Non fourni" }}</strong>

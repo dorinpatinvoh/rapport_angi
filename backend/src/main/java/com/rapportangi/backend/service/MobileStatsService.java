@@ -17,13 +17,26 @@ public class MobileStatsService {
 
   private final Map<String, String> urls, keys;
   private final RestClient client;
+  private final ZoneGoalsService zoneGoals;
 
+  public MobileStatsService(
+    String azoUrl,
+    String azoKey,
+    String zehamiUrl,
+    String zehamiKey
+  ) {
+    this(azoUrl, azoKey, zehamiUrl, zehamiKey, null);
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
   public MobileStatsService(
     @Value("${app.integrations.azo.url:}") String azoUrl,
     @Value("${app.integrations.azo.key:}") String azoKey,
     @Value("${app.integrations.zehami.url:}") String zehamiUrl,
-    @Value("${app.integrations.zehami.key:}") String zehamiKey
+    @Value("${app.integrations.zehami.key:}") String zehamiKey,
+    ZoneGoalsService zoneGoals
   ) {
+    this.zoneGoals = zoneGoals;
     urls = Map.of("AZO", azoUrl, "ZEHAMI", zehamiUrl);
     keys = Map.of("AZO", azoKey, "ZEHAMI", zehamiKey);
     var factory = new JdkClientHttpRequestFactory(
@@ -91,7 +104,11 @@ public class MobileStatsService {
         stats.registrations() > 1000000
       ) throw new IllegalArgumentException();
       AzoProfiles.validate(stats.profileCounts(), user.getTeam());
-      SalesGoals.validate(stats.goalCounts(), user.getTeam());
+      if (zoneGoals == null) SalesGoals.validate(
+        stats.goalCounts(),
+        user.getTeam()
+      );
+      else zoneGoals.validate(stats.goalCounts(), user, null);
       return stats;
     } catch (Exception ex) {
       throw new ResponseStatusException(
